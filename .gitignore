@@ -1,2 +1,4 @@
 .env
-scripts/env/
+**/env/
+scripts/insert/*.sql
+scripts/distribution/figures
