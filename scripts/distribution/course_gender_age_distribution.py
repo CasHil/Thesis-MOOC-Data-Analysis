@@ -53,16 +53,18 @@ def plot_age_distribution(course_df, course_name):
     unknown_population = course_df[course_df['Gender'].isnull()]
     other_population = course_df[course_df['Gender'] == 'o']
 
+    independent_variable = "Age"
+    
     sns.set_theme(style="whitegrid")
     colors = sns.color_palette(["#fe9929", "#1f78b4", "#f768a1", "#33a02c"])
     palette = sns.set_palette(colors)
     sns.set_context("notebook", font_scale=1.5, rc={"lines.linewidth": 2.5})
 
     plt.figure(figsize=(12, 8))
-    sns.histplot(male_population, x="Age", binwidth=1, alpha=1.0, label='Male', palette=palette)
-    sns.histplot(female_population, x="Age", binwidth=1, alpha=0.8, label='Female', palette=palette)
-    sns.histplot(unknown_population, x="Age", binwidth=1, alpha=0.5, label='Prefer not to say / Unknown', palette=palette)
-    sns.histplot(other_population, x="Age", binwidth=1, alpha=1.0, label='Other', palette=palette)
+    sns.histplot(male_population, x=independent_variable, binwidth=1, alpha=1.0, label='Male', palette=palette)
+    sns.histplot(female_population, x=independent_variable, binwidth=1, alpha=0.8, label='Female', palette=palette)
+    sns.histplot(unknown_population, x=independent_variable, binwidth=1, alpha=0.5, label='Prefer not to say / Unknown', palette=palette)
+    sns.histplot(other_population, x=independent_variable, binwidth=1, alpha=1.0, label='Other', palette=palette)
 
     plt.title(f"Age distribution per gender for {course_name}")    
     plt.xlabel("Age")
