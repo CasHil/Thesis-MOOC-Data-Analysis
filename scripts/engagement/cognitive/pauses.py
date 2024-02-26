@@ -14,21 +14,9 @@ COURSES = ['EX101x', 'ST1x', 'UnixTx']
 def find_all_log_files_for_course_id(course_id):
     return glob.glob(f"{WORKING_DIR}/{course_id}*/*.log", recursive=True)
 
-# def find_all_pause_events_for_course_id(course_id):
-#     pause_events = []
-#     for log_file in find_all_log_files_for_course_id(course_id):
-#         with open(log_file, 'r', encoding='utf-8') as f:
-#             for line in f:
-#                 if 'pause_video' in line:
-#                     pause_events.append(line)
-#     return pause_events
-
-# Temporarily only use the first 5 log files for a course for testing.
 def find_all_pause_events_for_course_id(course_id):
     pause_events = []
-    for i, log_file in enumerate(find_all_log_files_for_course_id(course_id)):
-        if i >= 5:  # Only process the first 5 log files
-            break
+    for log_file in find_all_log_files_for_course_id(course_id):
         with open(log_file, 'r', encoding='utf-8') as f:
             for line in f:
                 if 'pause_video' in line:
@@ -102,7 +90,7 @@ def create_average_pause_df(pauses_per_course):
 
 def create_pause_count_df(pause_counts, course_id):
     rows = []
-    for gender, counts in pause_counts.items():  # Directly use the passed dictionary
+    for gender, counts in pause_counts.items():
         for count in counts:
             rows.append({"Course": course_id, "Gender": gender, "PauseCount": count})
 
