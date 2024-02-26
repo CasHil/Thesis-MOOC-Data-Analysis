@@ -25,10 +25,10 @@ def insert_data():
 
     cur = conn.cursor()
 
-    for script in os.listdir('../insert'):
+    for script in os.listdir('./create_insert_scripts'):
         if script.endswith('.py'):
             print("Running script: ", script)
-            subprocess.run(["py", "../insert/" + script])
+            subprocess.run(["py", "./create_insert_scripts/" + script])
     
     for sql_file in os.listdir(WORKING_DIR):
         if sql_file.endswith('.sql'):
