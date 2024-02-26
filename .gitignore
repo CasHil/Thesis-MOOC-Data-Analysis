@@ -1,5 +1,6 @@
 .env
 **/env/
-scripts/insert/*.sql
-!scripts/insert/thesis_schema.sql
-scripts/graphs/figures
+*.sql
+!scripts/db/thesis_schema.sql
+scripts/demographic_distributions/figures
+*.json

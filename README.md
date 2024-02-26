@@ -9,4 +9,5 @@ The scripts are written in Python 3.12.1. To install the required packages, run 
 ### Creating the database
 To create the database, run the following command `python scripts/db/create_and_populate_db.py`. This will create a database called `thesis_db` in the working directory `\staff-umbrella/gdicsmoocs/Working copy/scripts`/
 
-##
+### Run graphing scripts
+To run the graphing scripts, run the command `python graphs/run_graph_scripts.py`.
