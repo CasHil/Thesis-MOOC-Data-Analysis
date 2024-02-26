@@ -68,26 +68,18 @@ def calculate_average_pause_count_per_gender(course_id):
     cur.close()
     con.close()
 
-    return gender_pause_averages
+    return gender_pause_counts, gender_pause_averages
 
-def graph_average_pauses_per_gender(average_pauses_per_course):
+def graph_average_pauses_per_gender(average_pauses_df):
     if not os.path.exists('graphs'):
         os.makedirs('graphs')
-    rows = []
-    for course, genders in average_pauses_per_course.items():
-        for gender, value in genders.items():
-            rows.append({"Course": course, "Gender": gender, "Value": value})
-
-    df = pd.DataFrame(rows)
-    gender_map = {'m': 'Male', 'f': 'Female', 'o': 'Other', None: 'Prefer not to say / Unknown'}
-    df['Gender'] = df['Gender'].map(gender_map)
-
+    
     sns.set_theme(style="whitegrid")
     colors = sns.color_palette(["#fe9929", "#1f78b4", "#f768a1", "#33a02c"])
     sns.set_palette(colors)
     sns.set_context("notebook", font_scale=1.5, rc={"lines.linewidth": 2.5})
 
-    g = sns.catplot(x='Course', y='Value', hue='Gender', kind='bar', data=df, height=6, aspect=1.5)
+    g = sns.catplot(x='Course', y='Value', hue='Gender', kind='bar', data=average_pauses_df, height=6, aspect=1.5)
     plt.xticks(rotation=45)
     plt.ylabel('Average Pauses')
     plt.xlabel('Course')
@@ -97,15 +89,76 @@ def graph_average_pauses_per_gender(average_pauses_per_course):
 
     g.savefig('graphs/average_pauses_per_gender.png')
 
+def create_average_pause_df(pauses_per_course):
+    rows = []
+    for course, genders in pauses_per_course.items():
+        for gender, value in genders.items():
+            rows.append({"Course": course, "Gender": gender, "Value": value})
+
+    df = pd.DataFrame(rows)
+    gender_map = {'m': 'Male', 'f': 'Female', 'o': 'Other', None: 'Prefer not to say / Unknown'}
+    df['Gender'] = df['Gender'].map(gender_map)
+    return df
+
+def create_pause_count_df(pause_counts, course_id):
+    rows = []
+    for gender, counts in pause_counts.items():  # Directly use the passed dictionary
+        for count in counts:
+            rows.append({"Course": course_id, "Gender": gender, "PauseCount": count})
+
+    df = pd.DataFrame(rows)
+    gender_map = {'m': 'Male', 'f': 'Female', 'o': 'Other', None: 'Prefer not to say / Unknown'}
+    df['Gender'] = df['Gender'].map(gender_map)
+    return df
+
+def test_normality(df, value_col):
+    p_values = {}
+    for group in df['Gender'].unique():
+        group_df = df[df['Gender'] == group][value_col]
+        if len(group_df) < 3:
+            continue
+        stat, p = shapiro(group_df)
+        p_values[group] = p
+    return p_values
+
+def test_homogeneity_of_variances(df, value_col):
+    samples = [group[value_col].values for name, group in df.groupby('Gender')]
+    stat, p = levene(*samples)
+    return p
+
+def perform_ttest(df, value_col, group1_label, group2_label):
+    group1_values = df[df['Gender'] == group1_label][value_col]
+    group2_values = df[df['Gender'] == group2_label][value_col]
+    t_stat, p_value = ttest_ind(group1_values, group2_values, equal_var=True)
+    return p_value
+
+def perform_mannwhitney(df, value_col, group1_label, group2_label):
+    group1_values = df[df['Gender'] == group1_label][value_col]
+    group2_values = df[df['Gender'] == group2_label][value_col]
+    u_stat, p_value = mannwhitneyu(group1_values, group2_values)
+    return p_value
+
 def main():
     average_pauses_per_course = {}
+    gender_pause_counts_per_course = {}
+
     for course_id in COURSES:
         print(f"Analysing pauses in course: {course_id}")
-        gender_pause_averages = calculate_average_pause_count_per_gender(course_id)
-        print(f"Average pauses in course {course_id}: {gender_pause_averages}") 
+        gender_pause_counts, gender_pause_averages = calculate_average_pause_count_per_gender(course_id)
+        gender_pause_counts_per_course[course_id] = gender_pause_counts
         average_pauses_per_course[course_id] = gender_pause_averages
-    
-    graph_average_pauses_per_gender(average_pauses_per_course)
+        pause_count_df = create_pause_count_df(gender_pause_counts_per_course[course_id], course_id)
+        pause_count_df = pause_count_df.loc[pause_count_df['Gender'].isin(['Male', 'Female'])]
+        
+        print("Normality Test Results:", test_normality(pause_count_df, 'PauseCount'))
+        print("Homogeneity of Variances Test P-Value:", test_homogeneity_of_variances(pause_count_df, 'PauseCount'))
+        print("T-Test P-Value between Male and Female:", perform_ttest(pause_count_df, 'PauseCount', 'Male', 'Female'))
+        print("Mann-Whitney U Test P-Value between Male and Female:", perform_mannwhitney(pause_count_df, 'PauseCount', 'Male', 'Female'))
+
+    average_pause_df = create_average_pause_df(average_pauses_per_course)
+    graph_average_pauses_per_gender(average_pause_df)
+
+
 
 if __name__ == '__main__':
     main()
