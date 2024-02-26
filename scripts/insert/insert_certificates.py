@@ -1,12 +1,15 @@
-OUTPUT_FOLDER = './insert_scripts/'
+import os
+
+WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy'
+OUTPUT_FOLDER = WORKING_DIR + '/scripts'
 
 def insert_certificates():
     certificate_files = find_certificate_files()
 
-    with open(OUTPUT_FOLDER + 'insert_certificates.sql', 'w') as output:
+    with open(OUTPUT_FOLDER + 'insert_certificates.sql', 'w', encoding='utf-8') as output:
         for certificate_file in certificate_files:
-            with open(certificate_file, 'r') as f:
-                output.write('INSERT INTO public.certificates (hash_id, grade, course_id, status, created_date, modified_date, mode) VALUES\n')
+            with open(certificate_file, 'r', encoding='utf-8') as f:
+                output.write('INSERT INTO certificates (hash_id, grade, course_id, status, created_date, modified_date, mode) VALUES\n')
                 for index, line in enumerate(f):
                     if index == 0:
                         continue
@@ -25,7 +28,7 @@ def insert_certificates():
             output.write("\n")
             output.write("ON CONFLICT DO NOTHING;\n\n")
     
-    with open(OUTPUT_FOLDER + 'insert_certificates.sql', 'r+') as f:
+    with open(OUTPUT_FOLDER + 'insert_certificates.sql', 'r+', encoding='utf-8') as f:
         data = f.read()
         data = data.replace("'NULL'", "NULL")
         f.seek(0)
@@ -35,11 +38,12 @@ def insert_certificates():
 def find_certificate_files():
     import os
     certificate_files = []
-    for root, _, files in os.walk("G:/staff-umbrella/gdicsmoocs/Working copy"):
+    for root, _, files in os.walk(WORKING_DIR):
         for file in files:
             if file.endswith("certificates_generatedcertificate-prod-analytics.sql"):
                 certificate_files.append(os.path.join(root, file))
     return certificate_files
+
 def main():
     insert_certificates()
 

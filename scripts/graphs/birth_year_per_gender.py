@@ -1,19 +1,15 @@
-import psycopg2
+import sqlite3
 from dotenv import load_dotenv
 import seaborn as sns
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import subprocess
 
 load_dotenv()
 
 def fetch_birth_year_and_gender():
-    conn = psycopg2.connect(
-        host="localhost",
-        database="thesis",
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn = sqlite3.connect("W:/staff-umbrella/gdicsmoocs/Working copy/scripts/thesis_db")
 
     cur = conn.cursor()
 
@@ -48,7 +44,7 @@ def plot_birth_year_distribution_for_all_courses(course_df):
 
     plt.title("Distribution of birth years")
     plt.legend(title='Gender', loc='upper right')
-    plt.savefig("./figures/distribution_of_birth_years.png")
+    plt.savefig("./figures/age/distribution_of_birth_years.png")
 
 def main():
     df = fetch_birth_year_and_gender()

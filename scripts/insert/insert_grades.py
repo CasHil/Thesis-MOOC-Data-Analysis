@@ -1,10 +1,13 @@
+WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy'
+OUTPUT_FOLDER = WORKING_DIR + '/scripts'
+
 def insert_grades():
     grade_files = find_grade_files()
 
-    with open('insert_grades.sql', 'w') as output:
+    with open(OUTPUT_FOLDER + 'insert_grades.sql', 'w', encoding='utf-8') as output:
         for grade_file in grade_files:
-            with open(grade_file, 'r') as f:
-                output.write('INSERT INTO public.grades (hash_id, course_id, percent_grade, letter_grade, passed_timestamp, created, modified) VALUES\n')
+            with open(grade_file, 'r', encoding='utf-8') as f:
+                output.write('INSERT INTO grades (hash_id, course_id, percent_grade, letter_grade, passed_timestamp, created, modified) VALUES\n')
                 for index, line in enumerate(f):
                     if index == 0:
                         continue
@@ -23,7 +26,7 @@ def insert_grades():
             output.write("\n")
             output.write("ON CONFLICT DO NOTHING;\n\n")
         
-    with open('insert_grades.sql', 'r+') as f:
+    with open(OUTPUT_FOLDER + 'insert_grades.sql', 'r+', encoding='utf-8') as f:
         data = f.read()
         data = data.replace("'NULL'", "NULL")
         f.seek(0)
@@ -34,7 +37,7 @@ def insert_grades():
 def find_grade_files():
     import os
     grade_files = []
-    for root, _, files in os.walk("G:/staff-umbrella/gdicsmoocs/Working copy"):
+    for root, _, files in os.walk(WORKING_DIR):
         for file in files:
             if file.endswith("grades_persistentcoursegrade-prod-analytics.sql"):
                 grade_files.append(os.path.join(root, file))

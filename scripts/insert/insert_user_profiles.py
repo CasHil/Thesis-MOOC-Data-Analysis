@@ -1,10 +1,13 @@
+WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy'
+OUTPUT_FOLDER = WORKING_DIR + '/scripts'
+
 def insert_user_profiles():
     user_profile_files = find_user_profile_files()
 
-    with open('insert_user_profiles.sql', 'w', encoding='UTF-8') as output:
+    with open(OUTPUT_FOLDER + 'insert_user_profiles.sql', 'w', encoding='utf-8') as output:
         for user_profile_file in user_profile_files:
-            with open(user_profile_file, 'r', encoding='UTF-8') as f:
-                output.write('INSERT INTO public.user_profiles (hash_id, language, gender, year_of_birth, level_of_education, goals, country) VALUES\n')
+            with open(user_profile_file, 'r', encoding='utf-8') as f:
+                output.write('INSERT INTO user_profiles (hash_id, language, gender, year_of_birth, level_of_education, goals, country) VALUES\n')
                 for index, line in enumerate(f):
                     if index == 0:
                         continue
@@ -26,7 +29,7 @@ def insert_user_profiles():
             output.write("\n")
             output.write("ON CONFLICT DO NOTHING;\n\n")
 
-    with open('insert_user_profiles.sql', 'r+', encoding='UTF-8') as f:
+    with open(OUTPUT_FOLDER + 'insert_user_profiles.sql', 'r+', encoding='utf-8') as f:
         data = f.read()
         data = data.replace("'NULL'", "NULL")
         f.seek(0)
@@ -36,7 +39,7 @@ def insert_user_profiles():
 def find_user_profile_files():
     import os
     user_profile_files = []
-    for root, _, files in os.walk("G:/staff-umbrella/gdicsmoocs/Working copy"):
+    for root, _, files in os.walk(WORKING_DIR):
         for file in files:
             if file.endswith("auth_userprofile-prod-analytics.sql"):
                 user_profile_files.append(os.path.join(root, file))

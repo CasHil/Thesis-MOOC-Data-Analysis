@@ -1,4 +1,5 @@
 .env
 **/env/
 scripts/insert/*.sql
-scripts/distribution/figures
+!scripts/insert/thesis_schema.sql
+scripts/graphs/figures

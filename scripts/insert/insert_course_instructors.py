@@ -1,9 +1,14 @@
+import os
+
+WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy'
+OUTPUT_FOLDER = WORKING_DIR + '/scripts'
+
 def insert_course_instructors():
     course_instructor_files = find_course_instructor_files()
-    with open('insert_course_instructors.sql', 'w') as output:
+    with open(OUTPUT_FOLDER + 'insert_course_instructors.sql', 'w', encoding='utf-8') as output:
         for course_instructor_file in course_instructor_files:
-            with open(course_instructor_file, 'r') as f:
-                output.write('INSERT INTO public.course_instructors (hash_id, org, course_id, role) VALUES\n')
+            with open(course_instructor_file, 'r', encoding='utf-8') as f:
+                output.write('INSERT INTO course_instructors (hash_id, org, course_id, role) VALUES\n')
                 for index, line in enumerate(f):
                     if index == 0:
                         continue
@@ -21,7 +26,7 @@ def insert_course_instructors():
             output.write("\n")
             output.write("ON CONFLICT DO NOTHING;\n\n")
     
-    with open('insert_course_instructors.sql', 'r+') as f:
+    with open(OUTPUT_FOLDER + 'insert_course_instructors.sql', 'r+', encoding='utf-8') as f:
         data = f.read()
         data = data.replace("'NULL'", "NULL")
         f.seek(0)
@@ -31,7 +36,7 @@ def insert_course_instructors():
 def find_course_instructor_files():
     import os
     course_instructor_files = []
-    for root, _, files in os.walk("G:/staff-umbrella/gdicsmoocs/Working copy"):
+    for root, _, files in os.walk(WORKING_DIR):
         for file in files:
             if file.endswith("student_courseaccessrole-prod-analytics.sql"):
                 course_instructor_files.append(os.path.join(root, file))
