@@ -8,6 +8,7 @@ import pandas as pd
 from scipy.stats import shapiro, levene, ttest_ind, mannwhitneyu, spearmanr
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
+import progressbar
 
 WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy'
 DB_LOCATION = WORKING_DIR + '/scripts/thesis_db'
@@ -21,23 +22,28 @@ def find_presurvey_files_for_course_id(course_id):
 
 def find_all_pause_events_for_course_id(course_id):
     pause_events = []
-    for log_file in find_all_log_files_for_course_id(course_id):
+    bar = progressbar.ProgressBar(maxval=len(find_all_log_files_for_course_id(course_id)), widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
+    bar.start()
+    
+    log_files = find_all_log_files_for_course_id(course_id)
+    for i, log_file in enumerate(log_files):
+        bar.update(i + 1)
         with open(log_file, 'r', encoding='utf-8') as f:
             for line in f:
                 if 'pause_video' in line:
                     pause_events.append(line)
     return pause_events
 
-# def find_all_pause_events_for_course_id_limit_5(course_id):
-#     pause_events = []
-#     for i, log_file in enumerate(find_all_log_files_for_course_id(course_id)):
-#         if i == 5:
-#             break
-#         with open(log_file, 'r', encoding='utf-8') as f:
-#             for line in f:
-#                 if 'pause_video' in line:
-#                     pause_events.append(line)
-#     return pause_events
+def find_all_pause_events_for_course_id_limit_5(course_id):
+    pause_events = []
+    for i, log_file in enumerate(find_all_log_files_for_course_id(course_id)):
+        if i == 5:
+            break
+        with open(log_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                if 'pause_video' in line:
+                    pause_events.append(line)
+    return pause_events
 
 def find_gender_by_user_id(user_id):
     con = sqlite3.connect(DB_LOCATION)
@@ -52,7 +58,7 @@ def find_gender_by_user_id(user_id):
 def calculate_pause_counts(course_id):
     con = sqlite3.connect(DB_LOCATION)
     cur = con.cursor()
-    pause_events = find_all_pause_events_for_course_id_limit_5(course_id)
+    pause_events = find_all_pause_events_for_course_id(course_id)
 
     user_pause_counts = {}
     for pause_event in pause_events:
@@ -229,7 +235,7 @@ def main():
         print("P-Value:", p_value)
         print("---------------------------------------------")
         print("Regression with Interaction Results:")
-        print(regression_with_interaction(user_pause_df))
+        print(regression_with_interaction(user_pause_df['Gender'].isin(['Male', 'Female'])))
         print("---------------------------------------------")
         pause_count_df = create_pause_count_df(gender_pause_counts_per_course[course_id], course_id)
         pause_count_df = pause_count_df.loc[pause_count_df['Gender'].isin(['Male', 'Female'])]

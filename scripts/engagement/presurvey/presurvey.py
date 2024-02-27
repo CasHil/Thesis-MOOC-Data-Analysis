@@ -10,7 +10,7 @@ def main():
     print(presurvey['Q108_1'].value_counts())
     # Drop StartDate and EndDate
     # presurvey = presurvey.drop(columns=['StartDate', 'EndDate', 'Status', 'Progress', 'Duration..in.seconds.', 'Finished', 'RecordedDate', 'ResponseId', 'DistributionChannel', 'hash_id', 'course_id', 'course_type', 'Q4.2', 'Q4.2.4_1', 'Q4.2.4_2', 'Q4.3_1', 'Q4.4', 'Q4.5_1', 'Q4.5_2', 'Q4.6_9_TEXT', 'SP'])
-    print(presurvey.head(10))
+    # print(presurvey.head(10))
 
     # Q4.2: Which of the following best describes your current employment status?
     # Q4.3_1: What is your age? - Years:
