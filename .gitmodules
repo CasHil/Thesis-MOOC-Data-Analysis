@@ -1,3 +1,6 @@
 [submodule "scripts/engagement/behavioural/learning_paths/ELAT-Node"]
 	path = scripts/engagement/behavioural/learning_paths/ELAT-Node
 	url = https://github.com/CasHil/ELAT-Node.git
+[submodule "scripts/engagement/behavioural/learning_paths/ELAT-Workbench"]
+	path = scripts/engagement/behavioural/learning_paths/ELAT-Workbench
+	url = https://github.com/CasHil/ELAT-Workbench.git
