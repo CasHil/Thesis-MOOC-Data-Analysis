@@ -4,3 +4,6 @@
 !scripts/db/thesis_schema.sql
 scripts/demographic_distributions/figures
 *.json
+*.png
+node_modules
+*.pptx

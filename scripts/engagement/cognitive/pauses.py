@@ -182,7 +182,6 @@ def regression_with_interaction(df):
     else:
         df['Gender_code'] = df['Gender']
     
-    # Fit the regression model with an interaction term between Q108_1_numeric and Gender
     model = smf.ols('PauseCount ~ Q108_1_numeric * Gender_code', data=df).fit()
     return model.summary()
 

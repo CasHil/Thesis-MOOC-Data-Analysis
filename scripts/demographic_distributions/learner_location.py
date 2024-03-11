@@ -238,7 +238,6 @@ def plot_location_distribution_female_male_ratio_per_course(df):
 
 def main():
     df = fetch_country_gender_course_id()
-    
     # Country codes tsv created from https://www.nationsonline.org/oneworld/country_code_list.htm.
     country_codes = pd.read_csv('./country_codes.tsv', sep='\t', usecols=[0, 1, 2])
     country_codes.columns = ['Full name', 'Two-letter code', 'Three-letter code']
