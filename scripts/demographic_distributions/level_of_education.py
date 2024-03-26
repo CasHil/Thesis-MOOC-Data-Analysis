@@ -1,9 +1,8 @@
 import sqlite3
 from dotenv import load_dotenv
-import seaborn as sns
-import os
 import pandas as pd
 import matplotlib.pyplot as plt
+from course_utilities import identify_course
 
 load_dotenv()
 
@@ -24,16 +23,6 @@ def fetch_birth_year_gender_course_id():
     conn.close()
 
     return df
-
-def identify_course(course_id):
-    if 'EX101x' in course_id:
-        return 'EX101x'
-    elif 'ST1x' in course_id:
-        return 'ST1x'
-    elif 'UnixTx' in course_id:
-        return 'UnixTx'
-    else:
-        return 'Other'
 
 def plot_education_distribution(course_df, course_name):
     df_copy = course_df.copy()

@@ -5,9 +5,12 @@ import numpy as np
 import os
 import glob 
 import sqlite3
+import json
+import gzip
 
 WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy'
-COURSES = ['EX101x', 'ST1x', 'UnixTx']
+# COURSES = ['EX101x', 'ST1x', 'UnixTx', 'FP101x']
+COURSES = ['FP101x']
 FIGURES_DIR = './figures'
 
 
@@ -37,6 +40,8 @@ def identify_course(course_id):
         return 'ST1x'
     elif 'UnixTx' in course_id:
         return 'UnixTx'
+    elif 'FP101x' in course_id:
+        return 'FP101x'
     else:
         return 'Other'
     
@@ -153,11 +158,72 @@ def gender_count_per_course(hash_ids):
         print(f"Number of unknown who filled in presurvey for {course}: {genders.count(None)}")
         print(f"Number of other who filled in presurvey for {course}: {genders.count('o')}")
 
-def main():
-    if not os.path.exists(FIGURES_DIR):
-        os.makedirs(FIGURES_DIR)
+def extract_all_user_ids(log_files):
+        user_ids = set()
+        for log_file in log_files:
+            print("Extracting user_ids from", log_file)
+            with gzip.open(log_file, 'rt', encoding='utf-8') as f:
+                for line in f:
+                    try:
+                        data = json.loads(line)
+                        user_id = data.get("context", {}).get("user_id", "")
+                        if user_id:
+                            user_ids.add(user_id)
+                    except json.JSONDecodeError:
+                        continue
+        return user_ids
 
-    QUESTION_TEXT = get_question_texts()
+def extract_all_user_ids(log_files):
+    user_ids = set()
+    for log_file in log_files:
+        print("Extracting user_ids from", log_file)
+        with gzip.open(log_file, 'rt', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    data = json.loads(line)
+                    user_id = data.get("context", {}).get("user_id", "")
+                    if user_id:
+                        user_ids.add(user_id)
+                except json.JSONDecodeError:
+                    continue
+    return user_ids
+
+def find_log_files(base_path, prefixes):
+    log_files = []
+    for root, dirs, files in os.walk(base_path):
+        for file in files:
+            # if file.endswith(".log.gz") and any(root.split(os.sep)[-1].startswith(prefix) for prefix in prefixes):
+            if file.endswith(".log.gz"):
+                log_files.append(os.path.join(root, file))
+    return log_files
+
+def main():
+    base_path = 'W:/staff-umbrella/gdicsmoocs/Working copy/FP101x_3T2015_run2'
+    prefixes = ["EX101x", "ST1x", "UnixTx", "FP101x"]
+
+    with open('user_profiles.json', 'r', encoding='utf-8') as json_file:
+        user_profiles = json.load(json_file)
+
+    print("Finding log files...")
+    log_files = find_log_files(base_path, prefixes)
+
+    print("Extracting user ids from logs...")
+    all_user_ids_from_logs = extract_all_user_ids(log_files)
+
+    print("All user ids from logs", all_user_ids_from_logs
+          )
+    print("Filtering user profiles...")
+    filtered_profiles = [
+        profile for profile in user_profiles
+        if profile['gender'] in ['m', 'f'] and profile['hash_id'] in all_user_ids_from_logs
+    ]
+
+    print("Filtered profiles", filtered_profiles)
+    hash_ids_filtered = set(profile['hash_id'] for profile in filtered_profiles)
+    # if not os.path.exists(FIGURES_DIR):
+    #     os.makedirs(FIGURES_DIR)
+
+    # QUESTION_TEXT = get_question_texts()
 
     hash_ids_per_course = {course: set() for course in COURSES}
 
@@ -182,6 +248,38 @@ def main():
             for hash_id in hash_ids:
                 hash_ids_per_course[course].add(hash_id)
     
-    gender_count_per_course(hash_ids_per_course)
+    # gender_count_per_course(hash_ids_per_course)
+                
+    for course in COURSES:
+        print(f"Number of hash_ids for {course}: {len(hash_ids_per_course[course])}")
+        print(f"Hash ids filtered {hash_ids_filtered}")
+        print(f"Hash ids per course {hash_ids_per_course[course]}")
+        print(hash_ids_per_course[course].intersection(hash_ids_filtered))
+        intersect = hash_ids_per_course[course].intersection(hash_ids_filtered)
+        men = [profile for profile in filtered_profiles if profile['hash_id'] in intersect and profile['gender'] == 'm']
+
+        women = [profile for profile in filtered_profiles if profile['hash_id'] in intersect and profile['gender'] == 'f']
+
+        print([profile for profile in filtered_profiles if profile['hash_id'] in intersect])
+        print(len(men))
+        print(len(women))
+        # Number of hash_ids for EX101x: 9666
+# 2095
+# 991
+# Number of hash_ids for ST1x: 3846
+# 1222
+# 601
+# Number of hash_ids for UnixTx: 1016
+# 445
+# 94
+# Number of hash_ids for FP101x: 3487
+# 2771
+# 192
+        # Save the intersection of hash_ids_filtered and hash_ids_per_course[course] to a json file
+        with open(f'{course}_hash_ids.json', 'w') as json_file:
+            json.dump(list(hash_ids_per_course[course].intersection(hash_ids_filtered)), json_file)
+
+
+    
 if __name__ == "__main__":
     main()

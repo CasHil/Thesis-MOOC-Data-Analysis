@@ -1,10 +1,9 @@
 import sqlite3
 from dotenv import load_dotenv
 import seaborn as sns
-import os
 import pandas as pd
 import matplotlib.pyplot as plt
-import subprocess
+from course_utilities import extract_course_year, calculate_age, identify_course
 
 load_dotenv()
 
@@ -26,21 +25,6 @@ def fetch_birth_year_gender_course_id():
 
     return df
 
-def extract_course_year(course_id):
-    return int(course_id[-4:])
-
-def calculate_age(course_year, birth_year):
-    return course_year - birth_year
-
-def identify_course(course_id):
-    if 'EX101x' in course_id:
-        return 'EX101x'
-    elif 'ST1x' in course_id:
-        return 'ST1x'
-    elif 'UnixTx' in course_id:
-        return 'UnixTx'
-    else:
-        return 'Other'
 
 def plot_age_distribution(course_df, course_name):
     male_population = course_df[course_df['Gender'] == 'm']

@@ -1,10 +1,8 @@
 import sqlite3
 from dotenv import load_dotenv
 import seaborn as sns
-import os
 import pandas as pd
 import matplotlib.pyplot as plt
-import subprocess
 
 load_dotenv()
 

@@ -1,10 +1,7 @@
 import sqlite3
 from dotenv import load_dotenv
-import seaborn as sns
-import os
 import pandas as pd
-import matplotlib.pyplot as plt
-import subprocess
+from course_utilities import identify_course
 
 load_dotenv()
 
@@ -28,16 +25,6 @@ def fetch_gender_and_course():
     conn.close()
 
     return df
-
-def identify_course(course_id):
-    if 'EX101x' in course_id:
-        return 'EX101x'
-    elif 'ST1x' in course_id:
-        return 'ST1x'
-    elif 'UnixTx' in course_id:
-        return 'UnixTx'
-    else:
-        return 'Other'
 
 def gender_count_per_course(course_df, course_id):
     male_population = course_df[course_df['Gender'] == 'm']

@@ -1,11 +1,8 @@
 import sqlite3
-
 from dotenv import load_dotenv
-import seaborn as sns
-import os
 import pandas as pd
-import matplotlib.pyplot as plt
 import plotly.express as px
+from course_utilities import identify_course
 
 load_dotenv()
 BASE_URL = "figures/location/"
@@ -27,16 +24,6 @@ def fetch_country_gender_course_id():
     conn.close()
 
     return df
-
-def identify_course(course_id):
-    if 'EX101x' in course_id:
-        return 'EX101x'
-    elif 'ST1x' in course_id:
-        return 'ST1x'
-    elif 'UnixTx' in course_id:
-        return 'UnixTx'
-    else:
-        return 'Other'
 
 def plot_location_distribution(df):
     country_counts = df['Country'].value_counts().reset_index()
