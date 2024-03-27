@@ -6,7 +6,7 @@ load_dotenv()
 WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
 SCRIPTS_DIRECTORY = os.getenv('SCRIPTS_DIRECTORY')
 
-def insert_grades():
+def insert_grades() -> None:
     grade_files = find_grade_files()
 
     with open(SCRIPTS_DIRECTORY + 'insert_grades.sql', 'w', encoding='utf-8') as output:
@@ -39,7 +39,7 @@ def insert_grades():
         f.truncate()
 
         
-def find_grade_files():
+def find_grade_files() -> list[str]:
     import os
     grade_files = []
     for root, _, files in os.walk(WORKING_DIRECTORY):

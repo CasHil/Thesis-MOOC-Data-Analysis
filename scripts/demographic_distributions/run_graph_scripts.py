@@ -1,7 +1,7 @@
 import os
 import subprocess
 
-def main():
+def main() -> None:
     if not os.path.exists('figures'):
         os.makedirs('figures')
 

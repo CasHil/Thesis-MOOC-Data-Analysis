@@ -17,7 +17,7 @@ COURSES = ['EX101x', 'ST1x', 'UnixTx', 'FP101x']
 FIGURES_DIRECTORY = './figures'
 
 
-def fetch_gender_and_course():
+def fetch_gender_and_course() -> pd.DataFrame:
     conn = sqlite3.connect(MOOC_DB_LOCATION)
 
     cur = conn.cursor()
@@ -36,9 +36,10 @@ def fetch_gender_and_course():
 
     return df
     
-def find_all_presurveys_for_course_id(course_id):    return glob.glob(f"{WORKING_DIRECTORY}/{course_id}*/pre_survey*.txt", recursive=True)
+def find_all_presurveys_for_course_id(course_id: str) -> list[str]:    
+    return glob.glob(f"{WORKING_DIRECTORY}/{course_id}*/pre_survey*.txt", recursive=True)
 
-def plot_answers(pre_survey, question, survey_dir, question_text):
+def plot_answers(pre_survey: pd.DataFrame, question: list[str], survey_dir: str, question_text: str) -> None:
   
     order1 = ["Not at all important", "Slightly important", "Moderately important", "Important", "Very important"]
     order2 = ["Not at all important", "Slightly important", "Moderately important", "Very important", "Extremely important"]
@@ -75,10 +76,10 @@ def plot_answers(pre_survey, question, survey_dir, question_text):
     # Slightly important
     # Not at all important
 
-def find_all_presurveys_for_course_id(course_id):
+def find_all_presurveys_for_course_id(course_id: str) -> list[str]:
     return glob.glob(f"{WORKING_DIRECTORY}/{course_id}*/pre_survey*.txt", recursive=True)
 
-def plot_answers(pre_survey, question, survey_dir, question_text):
+def plot_answers(pre_survey: pd.DataFrame, question: str, survey_dir: str, question_text: str):
     order1 = ["Not at all important", "Slightly important", "Moderately important", "Important", "Very important"]
     order2 = ["Not at all important", "Slightly important", "Moderately important", "Very important", "Extremely important"]
 
@@ -115,7 +116,7 @@ def plot_answers(pre_survey, question, survey_dir, question_text):
     plt.savefig(plot_file_name)
     plt.close()
 
-def get_question_texts():
+def get_question_texts() -> dict[str, str]:
     return {
         "Q2.4_1": "How important were the following factors in your decision to enroll in this course? (Uniqueness of this course)",
         "Q2.4_2": "How important were the following factors in your decision to enroll in this course? (Potential usefulness of this course)",
@@ -133,7 +134,7 @@ def get_question_texts():
         "Q3.2_7": "How important are for you the following elements in this course? (Possibility to work on your own project, if applicable)"
     }
 
-def gender_count_per_course(hash_ids):
+def gender_count_per_course(hash_ids: dict[str, set[str]]) -> None:
     conn = sqlite3.connect(MOOC_DB_LOCATION)
 
     for course in COURSES:
@@ -148,7 +149,7 @@ def gender_count_per_course(hash_ids):
         print(f"Number of unknown who filled in presurvey for {course}: {genders.count(None)}")
         print(f"Number of other who filled in presurvey for {course}: {genders.count('o')}")
 
-def extract_all_user_ids(log_files):
+def extract_all_user_ids(log_files: list[str]) -> set[str]:
         user_ids = set()
         for log_file in log_files:
             print("Extracting user_ids from", log_file)
@@ -163,7 +164,7 @@ def extract_all_user_ids(log_files):
                         continue
         return user_ids
 
-def extract_all_user_ids(log_files):
+def extract_all_user_ids(log_files: list[str]) -> set[str]:
     user_ids = set()
     for log_file in log_files:
         print("Extracting user_ids from", log_file)
@@ -178,7 +179,7 @@ def extract_all_user_ids(log_files):
                     continue
     return user_ids
 
-def find_log_files(base_path):
+def find_log_files(base_path: str) -> list[str]:
     log_files = []
     for root, dirs, files in os.walk(base_path):
         for file in files:
@@ -186,8 +187,7 @@ def find_log_files(base_path):
                 log_files.append(os.path.join(root, file))
     return log_files
 
-def main():
-
+def main() -> None:
     with open('user_profiles.json', 'r', encoding='utf-8') as json_file:
         user_profiles = json.load(json_file)
 

@@ -7,7 +7,7 @@ load_dotenv()
 WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
 SCRIPTS_DIRECTORY = os.getenv('SCRIPTS_DIRECTORY')
 
-def insert_course_instructors():
+def insert_course_instructors() -> None:
     course_instructor_files = find_course_instructor_files()
     with open(SCRIPTS_DIRECTORY + 'insert_course_instructors.sql', 'w', encoding='utf-8') as output:
         for course_instructor_file in course_instructor_files:
@@ -37,7 +37,7 @@ def insert_course_instructors():
         f.write(data)
         f.truncate()
 
-def find_course_instructor_files():
+def find_course_instructor_files() -> list[str]:
     import os
     course_instructor_files = []
     for root, _, files in os.walk(WORKING_DIRECTORY):
@@ -46,7 +46,7 @@ def find_course_instructor_files():
                 course_instructor_files.append(os.path.join(root, file))
     return course_instructor_files
 
-def main():
+def main() - > None:
     insert_course_instructors()
 
 if __name__ == '__main__':

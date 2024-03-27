@@ -7,7 +7,7 @@ WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
 SCRIPTS_DIRECTORY = os.getenv('SCRIPTS_DIRECTORY')
 
 
-def insert_enrollments():
+def insert_enrollments() -> None:
     enrollment_files = find_enrollment_files()
 
     with open(SCRIPTS_DIRECTORY + 'insert_enrollments.sql', 'w', encoding='utf-8') as output:
@@ -39,7 +39,7 @@ def insert_enrollments():
         f.write(data)
         f.truncate()
 
-def find_enrollment_files():
+def find_enrollment_files() -> list[str]:
     import os
     enrollment_files = []
     for root, _, files in os.walk(WORKING_DIRECTORY):
@@ -48,7 +48,7 @@ def find_enrollment_files():
                 enrollment_files.append(os.path.join(root, file))
     return enrollment_files
 
-def main():
+def main() -> None:
     insert_enrollments()
 
 if __name__ == '__main__':

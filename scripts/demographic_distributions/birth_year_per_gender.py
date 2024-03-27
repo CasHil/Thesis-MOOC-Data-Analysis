@@ -9,7 +9,7 @@ load_dotenv()
 
 MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 
-def fetch_birth_year_and_gender():
+def fetch_birth_year_and_gender() -> pd.DataFrame:
     conn = sqlite3.connect(MOOC_DB_LOCATION)
 
     cur = conn.cursor()
@@ -26,7 +26,7 @@ def fetch_birth_year_and_gender():
 
     return df
 
-def plot_birth_year_distribution_for_all_courses(course_df):
+def plot_birth_year_distribution_for_all_courses(course_df: pd.DataFrame) -> None:
     male_population = course_df[course_df['Gender'] == 'm']
     female_population = course_df[course_df['Gender'] == 'f']
     unknown_population = course_df[course_df['Gender'].isnull()]
@@ -47,7 +47,7 @@ def plot_birth_year_distribution_for_all_courses(course_df):
     plt.legend(title='Gender', loc='upper right')
     plt.savefig("./figures/age/distribution_of_birth_years.png")
 
-def main():
+def main() -> None:
     df = fetch_birth_year_and_gender()
     plot_birth_year_distribution_for_all_courses(df)
 

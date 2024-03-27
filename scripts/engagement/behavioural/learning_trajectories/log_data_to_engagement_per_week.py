@@ -8,7 +8,7 @@ load_dotenv()
 
 MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 
-def fetch_log_data():
+def fetch_log_data() -> pd.DataFrame:
     conn = sqlite3.connect(MOOC_DB_LOCATION)
 
     cur = conn.cursor()
@@ -26,7 +26,7 @@ def fetch_log_data():
 
     return df
 
-def main():
+def main() -> None:
     pass
 
 if __name__ == 'main':

@@ -23,7 +23,7 @@ def create_db() -> None:
     cur.close()
     conn.close()
 
-def insert_demographic_data(db_name: str) -> None:
+def insert_demographic_data() -> None:
 
     conn = sqlite3.connect(MOOC_DB_LOCATION)
 
@@ -40,7 +40,7 @@ def insert_demographic_data(db_name: str) -> None:
     for sql_file in os.listdir(SCRIPTS_DIRECTORY):
         if sql_file.endswith('.sql'):
             with open(f"{SCRIPTS_DIRECTORY}/{sql_file}", 'r', encoding='utf-8') as insert:
-                print(f"Inserting data from {sql_file} into {db_name}...")
+                print(f"Inserting data from {sql_file}...")
                 cur.executescript(insert.read())
                     
     conn.commit()

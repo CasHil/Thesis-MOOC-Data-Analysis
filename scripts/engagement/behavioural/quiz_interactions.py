@@ -4,5 +4,5 @@ def main():
 if __name__ == "__main__":
     main()
     
-def calculate_quiz_interactions():
+def calculate_quiz_interactions() -> None:
     pass

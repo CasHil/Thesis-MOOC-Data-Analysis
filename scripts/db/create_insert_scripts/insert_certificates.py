@@ -6,7 +6,7 @@ load_dotenv()
 WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
 SCRIPTS_DIRECTORY = os.getenv('SCRIPTS_DIRECTORY')
 
-def insert_certificates():
+def insert_certificates() -> None:
     certificate_files = find_certificate_files()
 
     with open(SCRIPTS_DIRECTORY + 'insert_certificates.sql', 'w', encoding='utf-8') as output:
@@ -38,7 +38,7 @@ def insert_certificates():
         f.write(data)
         f.truncate()
 
-def find_certificate_files():
+def find_certificate_files() -> list[str]:
     import os
     certificate_files = []
     for root, _, files in os.walk(WORKING_DIRECTORY):
@@ -47,7 +47,7 @@ def find_certificate_files():
                 certificate_files.append(os.path.join(root, file))
     return certificate_files
 
-def main():
+def main() -> None:
     insert_certificates()
 
 if __name__ == '__main__':

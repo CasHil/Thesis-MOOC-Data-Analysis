@@ -6,7 +6,7 @@ load_dotenv()
 WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
 SCRIPTS_DIRECTORY = os.getenv('SCRIPTS_DIRECTORY')
 
-def insert_user_profiles():
+def insert_user_profiles() -> None:
     user_profile_files = find_user_profile_files()
 
     with open(SCRIPTS_DIRECTORY + 'insert_user_profiles.sql', 'w', encoding='utf-8') as output:
@@ -41,7 +41,7 @@ def insert_user_profiles():
         f.write(data)
         f.truncate()
 
-def find_user_profile_files():
+def find_user_profile_files() -> list[str]:
     import os
     user_profile_files = []
     for root, _, files in os.walk(WORKING_DIRECTORY):
@@ -50,7 +50,7 @@ def find_user_profile_files():
                 user_profile_files.append(os.path.join(root, file))
     return user_profile_files
 
-def main():
+def main() -> None:
     insert_user_profiles()
 
 if __name__ == '__main__':

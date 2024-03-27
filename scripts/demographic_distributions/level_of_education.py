@@ -9,7 +9,7 @@ load_dotenv()
 
 MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 
-def fetch_birth_year_gender_course_id():
+def fetch_education_level_and_demographic_info() -> pd.DataFrame:
     conn = sqlite3.connect(MOOC_DB_LOCATION)
     cur = conn.cursor()
 
@@ -27,7 +27,7 @@ def fetch_birth_year_gender_course_id():
 
     return df
 
-def plot_education_distribution(course_df, course_name):
+def plot_education_distribution(course_df: pd.DataFrame, course_name: str) -> None:
     df_copy = course_df.copy()
     df_copy['GenderLabel'] = df_copy['Gender'].map({'m': 'Male', 'f': 'Female', 'o': 'Other'}).fillna('Prefer not to say / Unknown')
     categories_order = ['Male', 'Female', 'Other', 'Prefer not to say / Unknown']
@@ -54,7 +54,7 @@ def plot_education_distribution(course_df, course_name):
     else:
         print(f"No valid data in 'GenderLabel' column for {course_name}")
 
-def expand_education_level(df):
+def expand_education_level(education_df: pd.DataFrame) -> None:
     education_map = {
         "none": "No formal education",
         "a": "College",
@@ -66,17 +66,17 @@ def expand_education_level(df):
         "b": "Bachelor's",
         "other": "Other educational background"
     }
-    df['Level of Education'] = df['Level of Education'].map(education_map)
-    df = df.dropna()
-    return df
+    education_df['Level of Education'] = education_df['Level of Education'].map(education_map)
+    education_df = education_df.dropna()
+    return education_df
 
-def main():
-    df = fetch_birth_year_gender_course_id()
-    df = expand_education_level(df)
-    df['Course Name'] = df['Course ID'].apply(identify_course)
-    courses = df['Course Name'].unique()
+def main() -> None:
+    education_df = fetch_education_level_and_demographic_info()
+    education_df = expand_education_level(education_df)
+    education_df['Course Name'] = education_df['Course ID'].apply(identify_course)
+    courses = education_df['Course Name'].unique()
     for course in courses:
-        course_df = df[df['Course Name'] == course]
+        course_df = education_df[education_df['Course Name'] == course]
         plot_education_distribution(course_df, course)
 
 if __name__ == '__main__':

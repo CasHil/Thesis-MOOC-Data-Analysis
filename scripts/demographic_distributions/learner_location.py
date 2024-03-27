@@ -11,7 +11,7 @@ BASE_FIGURE_URL = "figures/location/"
 
 MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 
-def fetch_country_gender_course_id():
+def fetch_country_gender_course_id() -> pd.DataFrame:
     conn = sqlite3.connect(MOOC_DB_LOCATION)
     cur = conn.cursor()
 
@@ -29,8 +29,8 @@ def fetch_country_gender_course_id():
 
     return df
 
-def plot_location_distribution(df):
-    country_counts = df['Country'].value_counts().reset_index()
+def plot_location_distribution(country_df: pd.DataFrame) -> None:
+    country_counts = country_df['Country'].value_counts().reset_index()
     country_counts.columns = ['Country', 'Count']
     fig = px.choropleth(country_counts, locations='Country',
                         color='Count',
@@ -56,9 +56,9 @@ def plot_location_distribution(df):
     )
     fig.write_image(BASE_FIGURE_URL + "learner_location_distribution.png")
 
-def plot_location_distribution_per_course(df):
-    for course in df['Course ID'].unique():
-        course_df = df[df['Course ID'] == course]
+def plot_location_distribution_per_course(course_country_df: pd.DataFrame) -> None:
+    for course in course_country_df['Course ID'].unique():
+        course_df = course_country_df[course_country_df['Course ID'] == course]
         course_name = identify_course(course)
         country_counts = course_df['Country'].value_counts().reset_index()
         country_counts.columns = ['Country', 'Count']
@@ -86,9 +86,9 @@ def plot_location_distribution_per_course(df):
         )
         fig.write_image(BASE_FIGURE_URL + f"learner_location_distribution_{course_name}.png")
 
-def plot_location_distribution_per_gender(df, graph_name=None):
-    men_df = df[df['Gender'] == 'm']
-    women_df = df[df['Gender'] == 'f']
+def plot_location_distribution_per_gender(location_df: pd.DataFrame, graph_name: str = None) -> None:
+    men_df = location_df[location_df['Gender'] == 'm']
+    women_df = location_df[location_df['Gender'] == 'f']
 
     men_counts = men_df['Country'].value_counts().reset_index()
     men_counts.columns = ['Country', 'Count']
@@ -147,14 +147,14 @@ def plot_location_distribution_per_gender(df, graph_name=None):
     image_location = BASE_FIGURE_URL + f"{graph_name} Women.png" if graph_name else "figures/learner_location_distribution_women.png"
     fig_women.write_image(image_location)
 
-def plot_location_distribution_per_gender_per_course(df):
-    for course in df['Course ID'].unique():
-        course_df = df[df['Course ID'] == course]
+def plot_location_distribution_per_gender_per_course(location_gender_per_course_df: pd.DataFrame) -> None:
+    for course in location_gender_per_course_df['Course ID'].unique():
+        course_df = location_gender_per_course_df[location_gender_per_course_df['Course ID'] == course]
         course_name = identify_course(course)
         graph_name = f"Learner location distribution for {course_name}"
         plot_location_distribution_per_gender(course_df, graph_name)
 
-def plot_location_distribution_female_male_ratio(df):
+def plot_location_distribution_female_male_ratio(df: pd.DataFrame) -> None:
     men_df = df[df['Gender'] == 'm']
     women_df = df[df['Gender'] == 'f']
 
@@ -189,9 +189,9 @@ def plot_location_distribution_female_male_ratio(df):
     )
     fig_ratio.write_image(BASE_FIGURE_URL + "learner_location_female_male_ratio.png")
 
-def plot_location_distribution_female_male_ratio_per_course(df):
-    for course in df['Course ID'].unique():
-        course_df = df[df['Course ID'] == course]
+def plot_location_distribution_female_male_ratio_per_course(location_gender_per_course_df: pd.DataFrame) -> None:
+    for course in location_gender_per_course_df['Course ID'].unique():
+        course_df = location_gender_per_course_df[location_gender_per_course_df['Course ID'] == course]
         course_name = identify_course(course)
         men_df = course_df[course_df['Gender'] == 'm']
         women_df = course_df[course_df['Gender'] == 'f']
@@ -227,7 +227,7 @@ def plot_location_distribution_female_male_ratio_per_course(df):
         )
         fig_ratio.write_image(BASE_FIGURE_URL + f"learner_location_female_male_ratio_{course_name}.png")
 
-def main():
+def main() -> None:
     df = fetch_country_gender_course_id()
     # Country codes tsv created from https://www.nationsonline.org/oneworld/country_code_list.htm.
     country_codes = pd.read_csv('./country_codes.tsv', sep='\t', usecols=[0, 1, 2])

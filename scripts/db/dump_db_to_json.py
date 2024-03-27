@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
+WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
 
 def dump_db_to_json():
     conn = sqlite3.connect(MOOC_DB_LOCATION)
@@ -24,7 +25,7 @@ def dump_db_to_json():
 
         rows_as_dict = [dict(row) for row in rows]
 
-        json_file_path = os.path.join(WORKING_DIR, f"{table_name}.json")
+        json_file_path = os.path.join(WORKING_DIRECTORY, f"{table_name}.json")
 
         with open(json_file_path, 'w', encoding='utf-8') as json_file:
             json.dump(rows_as_dict, json_file, ensure_ascii=False, indent=4)
