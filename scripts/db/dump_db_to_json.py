@@ -3,10 +3,10 @@ import os
 import json
 
 WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy/scripts'
-DB_LOCATION = os.path.join(WORKING_DIR, 'thesis_db')
 
-def dump_db_to_json():
-    conn = sqlite3.connect(DB_LOCATION)
+def dump_db_to_json(db_name: str):
+    db_location = f"{WORKING_DIR}/{db_name}"
+    conn = sqlite3.connect(db_location)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 

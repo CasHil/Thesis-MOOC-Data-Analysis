@@ -1,11 +1,9 @@
 import os
 
-WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy/scripts'
-DB_LOCATION = WORKING_DIR + '/thesis_db'
+WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy/scripts/'
 
-def main():
-    os.remove(DB_LOCATION)
-    print("Database removed")
+def remove_db(db_name: str) -> None:
+    db_location = WORKING_DIR + db_name
+    os.remove(db_location)
+    print(f"Database {db_location} removed")
 
-if __name__ == '__main__':
-    main()
