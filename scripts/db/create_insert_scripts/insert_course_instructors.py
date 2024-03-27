@@ -1,11 +1,15 @@
 import os
 
-WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy'
-OUTPUT_FOLDER = WORKING_DIR + '/scripts/'
+from dotenv import load_dotenv
+
+load_dotenv()
+
+WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
+SCRIPTS_DIRECTORY = os.getenv('SCRIPTS_DIRECTORY')
 
 def insert_course_instructors():
     course_instructor_files = find_course_instructor_files()
-    with open(OUTPUT_FOLDER + 'insert_course_instructors.sql', 'w', encoding='utf-8') as output:
+    with open(SCRIPTS_DIRECTORY + 'insert_course_instructors.sql', 'w', encoding='utf-8') as output:
         for course_instructor_file in course_instructor_files:
             with open(course_instructor_file, 'r', encoding='utf-8') as f:
                 output.write('INSERT INTO course_instructors (hash_id, org, course_id, role) VALUES\n')
@@ -26,7 +30,7 @@ def insert_course_instructors():
             output.write("\n")
             output.write("ON CONFLICT DO NOTHING;\n\n")
     
-    with open(OUTPUT_FOLDER + 'insert_course_instructors.sql', 'r+', encoding='utf-8') as f:
+    with open(SCRIPTS_DIRECTORY + 'insert_course_instructors.sql', 'r+', encoding='utf-8') as f:
         data = f.read()
         data = data.replace("'NULL'", "NULL")
         f.seek(0)
@@ -36,7 +40,7 @@ def insert_course_instructors():
 def find_course_instructor_files():
     import os
     course_instructor_files = []
-    for root, _, files in os.walk(WORKING_DIR):
+    for root, _, files in os.walk(WORKING_DIRECTORY):
         for file in files:
             if file.endswith("student_courseaccessrole-prod-analytics.sql"):
                 course_instructor_files.append(os.path.join(root, file))

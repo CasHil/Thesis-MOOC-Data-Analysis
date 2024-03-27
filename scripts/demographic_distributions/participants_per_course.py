@@ -2,13 +2,16 @@ import sqlite3
 from dotenv import load_dotenv
 import pandas as pd
 from course_utilities import identify_course
+import os
 
 load_dotenv()
 
 COURSES = ['EX101x', 'ST1x', 'UnixTx']
 
+MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
+
 def fetch_gender_and_course():
-    conn = sqlite3.connect("W:/staff-umbrella/gdicsmoocs/Working copy/scripts/thesis_db")
+    conn = sqlite3.connect(MOOC_DB_LOCATION)
 
     cur = conn.cursor()
 

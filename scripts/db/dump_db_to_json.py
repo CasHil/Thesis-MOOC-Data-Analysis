@@ -1,12 +1,15 @@
 import sqlite3
 import os
 import json
+from dotenv import load_dotenv
 
-WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy/scripts'
+load_dotenv()
 
-def dump_db_to_json(db_name: str):
-    db_location = f"{WORKING_DIR}/{db_name}"
-    conn = sqlite3.connect(db_location)
+MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
+
+def dump_db_to_json():
+    conn = sqlite3.connect(MOOC_DB_LOCATION)
+
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 

@@ -1,12 +1,15 @@
 import os
+from dotenv import load_dotenv
 
-WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy'
-OUTPUT_FOLDER = WORKING_DIR + '/scripts/'
+load_dotenv()
+
+WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
+SCRIPTS_DIRECTORY = os.getenv('SCRIPTS_DIRECTORY')
 
 def insert_certificates():
     certificate_files = find_certificate_files()
 
-    with open(OUTPUT_FOLDER + 'insert_certificates.sql', 'w', encoding='utf-8') as output:
+    with open(SCRIPTS_DIRECTORY + 'insert_certificates.sql', 'w', encoding='utf-8') as output:
         for certificate_file in certificate_files:
             with open(certificate_file, 'r', encoding='utf-8') as f:
                 output.write('INSERT INTO certificates (hash_id, grade, course_id, status, created_date, modified_date, mode) VALUES\n')
@@ -28,7 +31,7 @@ def insert_certificates():
             output.write("\n")
             output.write("ON CONFLICT DO NOTHING;\n\n")
     
-    with open(OUTPUT_FOLDER + 'insert_certificates.sql', 'r+', encoding='utf-8') as f:
+    with open(SCRIPTS_DIRECTORY + 'insert_certificates.sql', 'r+', encoding='utf-8') as f:
         data = f.read()
         data = data.replace("'NULL'", "NULL")
         f.seek(0)
@@ -38,7 +41,7 @@ def insert_certificates():
 def find_certificate_files():
     import os
     certificate_files = []
-    for root, _, files in os.walk(WORKING_DIR):
+    for root, _, files in os.walk(WORKING_DIRECTORY):
         for file in files:
             if file.endswith("certificates_generatedcertificate-prod-analytics.sql"):
                 certificate_files.append(os.path.join(root, file))

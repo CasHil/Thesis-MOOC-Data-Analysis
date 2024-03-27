@@ -7,15 +7,18 @@ import glob
 import sqlite3
 import json
 import gzip
+from dotenv import load_dotenv
 
-WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy'
-# COURSES = ['EX101x', 'ST1x', 'UnixTx', 'FP101x']
-COURSES = ['FP101x']
-FIGURES_DIR = './figures'
+load_dotenv()
+
+WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
+MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
+COURSES = ['EX101x', 'ST1x', 'UnixTx', 'FP101x']
+FIGURES_DIRECTORY = './figures'
 
 
 def fetch_gender_and_course():
-    conn = sqlite3.connect("W:/staff-umbrella/gdicsmoocs/Working copy/scripts/thesis_db")
+    conn = sqlite3.connect(MOOC_DB_LOCATION)
 
     cur = conn.cursor()
 
@@ -32,21 +35,8 @@ def fetch_gender_and_course():
     conn.close()
 
     return df
-
-def identify_course(course_id):
-    if 'EX101x' in course_id:
-        return 'EX101x'
-    elif 'ST1x' in course_id:
-        return 'ST1x'
-    elif 'UnixTx' in course_id:
-        return 'UnixTx'
-    elif 'FP101x' in course_id:
-        return 'FP101x'
-    else:
-        return 'Other'
     
-def find_all_presurveys_for_course_id(course_id):
-    return glob.glob(f"{WORKING_DIR}/{course_id}*/pre_survey*.txt", recursive=True)
+def find_all_presurveys_for_course_id(course_id):    return glob.glob(f"{WORKING_DIRECTORY}/{course_id}*/pre_survey*.txt", recursive=True)
 
 def plot_answers(pre_survey, question, survey_dir, question_text):
   
@@ -86,7 +76,7 @@ def plot_answers(pre_survey, question, survey_dir, question_text):
     # Not at all important
 
 def find_all_presurveys_for_course_id(course_id):
-    return glob.glob(f"{WORKING_DIR}/{course_id}*/pre_survey*.txt", recursive=True)
+    return glob.glob(f"{WORKING_DIRECTORY}/{course_id}*/pre_survey*.txt", recursive=True)
 
 def plot_answers(pre_survey, question, survey_dir, question_text):
     order1 = ["Not at all important", "Slightly important", "Moderately important", "Important", "Very important"]
@@ -144,7 +134,7 @@ def get_question_texts():
     }
 
 def gender_count_per_course(hash_ids):
-    conn = sqlite3.connect("W:/staff-umbrella/gdicsmoocs/Working copy/scripts/thesis_db")
+    conn = sqlite3.connect(MOOC_DB_LOCATION)
 
     for course in COURSES:
         cur = conn.cursor()
@@ -188,24 +178,21 @@ def extract_all_user_ids(log_files):
                     continue
     return user_ids
 
-def find_log_files(base_path, prefixes):
+def find_log_files(base_path):
     log_files = []
     for root, dirs, files in os.walk(base_path):
         for file in files:
-            # if file.endswith(".log.gz") and any(root.split(os.sep)[-1].startswith(prefix) for prefix in prefixes):
-            if file.endswith(".log.gz"):
+            if file.endswith(".log.gz") and any(root.split(os.sep)[-1].startswith(course) for course in COURSES):
                 log_files.append(os.path.join(root, file))
     return log_files
 
 def main():
-    base_path = 'W:/staff-umbrella/gdicsmoocs/Working copy/FP101x_3T2015_run2'
-    prefixes = ["EX101x", "ST1x", "UnixTx", "FP101x"]
 
     with open('user_profiles.json', 'r', encoding='utf-8') as json_file:
         user_profiles = json.load(json_file)
 
     print("Finding log files...")
-    log_files = find_log_files(base_path, prefixes)
+    log_files = find_log_files(WORKING_DIRECTORY)
 
     print("Extracting user ids from logs...")
     all_user_ids_from_logs = extract_all_user_ids(log_files)
@@ -279,7 +266,5 @@ def main():
         with open(f'{course}_hash_ids.json', 'w') as json_file:
             json.dump(list(hash_ids_per_course[course].intersection(hash_ids_filtered)), json_file)
 
-
-    
 if __name__ == "__main__":
     main()

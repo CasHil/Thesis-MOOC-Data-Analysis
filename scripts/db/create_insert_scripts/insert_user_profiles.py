@@ -1,10 +1,15 @@
-WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy'
-OUTPUT_FOLDER = WORKING_DIR + '/scripts/'
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
+SCRIPTS_DIRECTORY = os.getenv('SCRIPTS_DIRECTORY')
 
 def insert_user_profiles():
     user_profile_files = find_user_profile_files()
 
-    with open(OUTPUT_FOLDER + 'insert_user_profiles.sql', 'w', encoding='utf-8') as output:
+    with open(SCRIPTS_DIRECTORY + 'insert_user_profiles.sql', 'w', encoding='utf-8') as output:
         for user_profile_file in user_profile_files:
             with open(user_profile_file, 'r', encoding='utf-8') as f:
                 output.write('INSERT INTO user_profiles (hash_id, language, gender, year_of_birth, level_of_education, goals, country) VALUES\n')
@@ -29,7 +34,7 @@ def insert_user_profiles():
             output.write("\n")
             output.write("ON CONFLICT DO NOTHING;\n\n")
 
-    with open(OUTPUT_FOLDER + 'insert_user_profiles.sql', 'r+', encoding='utf-8') as f:
+    with open(SCRIPTS_DIRECTORY + 'insert_user_profiles.sql', 'r+', encoding='utf-8') as f:
         data = f.read()
         data = data.replace("'NULL'", "NULL")
         f.seek(0)
@@ -39,7 +44,7 @@ def insert_user_profiles():
 def find_user_profile_files():
     import os
     user_profile_files = []
-    for root, _, files in os.walk(WORKING_DIR):
+    for root, _, files in os.walk(WORKING_DIRECTORY):
         for file in files:
             if file.endswith("auth_userprofile-prod-analytics.sql"):
                 user_profile_files.append(os.path.join(root, file))

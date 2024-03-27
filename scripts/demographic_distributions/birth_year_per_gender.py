@@ -3,11 +3,14 @@ from dotenv import load_dotenv
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
 
 load_dotenv()
 
+MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
+
 def fetch_birth_year_and_gender():
-    conn = sqlite3.connect("W:/staff-umbrella/gdicsmoocs/Working copy/scripts/thesis_db")
+    conn = sqlite3.connect(MOOC_DB_LOCATION)
 
     cur = conn.cursor()
 

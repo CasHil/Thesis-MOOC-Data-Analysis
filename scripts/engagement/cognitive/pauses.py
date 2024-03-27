@@ -9,16 +9,19 @@ from scipy.stats import shapiro, levene, ttest_ind, mannwhitneyu, spearmanr
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 import progressbar
+from dotenv import load_dotenv
 
-WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy'
-DB_LOCATION = WORKING_DIR + '/scripts/thesis_db'
+load_dotenv()
+
+WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
+MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 COURSES = ['EX101x', 'ST1x', 'UnixTx']
 
 def find_all_log_files_for_course_id(course_id):
-    return glob.glob(f"{WORKING_DIR}/{course_id}*/*.log", recursive=True)
+    return glob.glob(f"{WORKING_DIRECTORY}/{course_id}*/*.log", recursive=True)
 
 def find_presurvey_files_for_course_id(course_id):
-    return glob.glob(f"{WORKING_DIR}/{course_id}*/pre_survey*.txt", recursive=True)
+    return glob.glob(f"{WORKING_DIRECTORY}/{course_id}*/pre_survey*.txt", recursive=True)
 
 def find_all_pause_events_for_course_id(course_id):
     pause_events = []
@@ -46,7 +49,7 @@ def find_all_pause_events_for_course_id_limit_5(course_id):
     return pause_events
 
 def find_gender_by_user_id(user_id):
-    con = sqlite3.connect(DB_LOCATION)
+    con = sqlite3.connect(MOOC_DB_LOCATION)
     cur = con.cursor()
     query = 'SELECT gender FROM user_profiles WHERE hash_id = ?'
     cur.execute(query, (user_id,))
@@ -56,7 +59,7 @@ def find_gender_by_user_id(user_id):
     return None
 
 def calculate_pause_counts(course_id):
-    con = sqlite3.connect(DB_LOCATION)
+    con = sqlite3.connect(MOOC_DB_LOCATION)
     cur = con.cursor()
     pause_events = find_all_pause_events_for_course_id(course_id)
 

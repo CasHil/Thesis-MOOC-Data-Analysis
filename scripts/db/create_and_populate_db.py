@@ -1,15 +1,18 @@
 import sqlite3
 import os
 import subprocess
+from dotenv import load_dotenv
 
-WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy/scripts'
+load_dotenv()
 
-def create_db(db_name: str) -> None:
-    db_location = f"{WORKING_DIR}/{db_name}"
-    if os.path.exists(db_location):
-        os.remove(db_location)
+SCRIPTS_DIRECTORY = os.getenv('SCRIPTS_DIRECTORY')
+MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
+
+def create_db() -> None:
+    if os.path.exists(MOOC_DB_LOCATION):
+        os.remove(MOOC_DB_LOCATION)
     
-    conn = sqlite3.connect(db_location)
+    conn = sqlite3.connect(MOOC_DB_LOCATION)
     cur = conn.cursor()
 
     with open('thesis_schema.sql', 'r') as schema:
@@ -20,21 +23,23 @@ def create_db(db_name: str) -> None:
     cur.close()
     conn.close()
 
-def insert_demographic_data(db_name: str, directory: str, directory_files: list[str]) -> None:
-    db_location = f"{WORKING_DIR}/{db_name}"
+def insert_demographic_data(db_name: str) -> None:
 
-    conn = sqlite3.connect(db_location)
+    conn = sqlite3.connect(MOOC_DB_LOCATION)
 
     cur = conn.cursor()
 
-    for script in directory_files:
+    insert_script_directory = "./create_insert_scripts"
+    insert_script_directory_files = os.listdir(insert_script_directory)
+    
+    for script in insert_script_directory_files:
         if script.endswith('.py'):
             print("Running script: ", script)
-            subprocess.run(["py",  f"{directory}/{script}"])
+            subprocess.run(["py",  f"{insert_script_directory}/{script}"])
     
-    for sql_file in os.listdir(WORKING_DIR):
+    for sql_file in os.listdir(SCRIPTS_DIRECTORY):
         if sql_file.endswith('.sql'):
-            with open(f"{WORKING_DIR}/{sql_file}", 'r', encoding='utf-8') as insert:
+            with open(f"{SCRIPTS_DIRECTORY}/{sql_file}", 'r', encoding='utf-8') as insert:
                 print(f"Inserting data from {sql_file} into {db_name}...")
                 cur.executescript(insert.read())
                     
@@ -44,9 +49,9 @@ def insert_demographic_data(db_name: str, directory: str, directory_files: list[
     conn.close()
 
 def delete_sql_files():
-    for sql_file in os.listdir(WORKING_DIR):
+    for sql_file in os.listdir(SCRIPTS_DIRECTORY):
         if sql_file.endswith('.sql'):
-            os.remove(f'{WORKING_DIR}/{sql_file}')
+            os.remove(f'{SCRIPTS_DIRECTORY}/{sql_file}')
 
 if __name__ == '__main__':
     create_db()

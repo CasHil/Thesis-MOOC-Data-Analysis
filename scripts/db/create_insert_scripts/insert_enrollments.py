@@ -1,12 +1,16 @@
 import os
+from dotenv import load_dotenv
 
-WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy'
-OUTPUT_FOLDER = WORKING_DIR + '/scripts/'
+load_dotenv()
+
+WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
+SCRIPTS_DIRECTORY = os.getenv('SCRIPTS_DIRECTORY')
+
 
 def insert_enrollments():
     enrollment_files = find_enrollment_files()
 
-    with open(OUTPUT_FOLDER + 'insert_enrollments.sql', 'w', encoding='utf-8') as output:
+    with open(SCRIPTS_DIRECTORY + 'insert_enrollments.sql', 'w', encoding='utf-8') as output:
         for enrollment_file in enrollment_files:
             with open(enrollment_file, 'r', encoding='utf-8') as f:
                 output.write('INSERT INTO enrollments (hash_id, course_id, created, is_active, mode) VALUES\n')
@@ -28,7 +32,7 @@ def insert_enrollments():
             output.write("\n")
             output.write("ON CONFLICT DO NOTHING;\n\n")
     
-    with open(OUTPUT_FOLDER + 'insert_enrollments.sql', 'r+', encoding='utf-8') as f:
+    with open(SCRIPTS_DIRECTORY + 'insert_enrollments.sql', 'r+', encoding='utf-8') as f:
         data = f.read()
         data = data.replace("'NULL'", "NULL")
         f.seek(0)
@@ -38,7 +42,7 @@ def insert_enrollments():
 def find_enrollment_files():
     import os
     enrollment_files = []
-    for root, _, files in os.walk(WORKING_DIR):
+    for root, _, files in os.walk(WORKING_DIRECTORY):
         for file in files:
             if file.endswith("student_courseenrollment-prod-analytics.sql"):
                 enrollment_files.append(os.path.join(root, file))

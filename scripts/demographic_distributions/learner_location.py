@@ -1,14 +1,18 @@
 import sqlite3
-from dotenv import load_dotenv
 import pandas as pd
 import plotly.express as px
 from course_utilities import identify_course
+import os
+from dotenv import load_dotenv
 
 load_dotenv()
-BASE_URL = "figures/location/"
+
+BASE_FIGURE_URL = "figures/location/"
+
+MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 
 def fetch_country_gender_course_id():
-    conn = sqlite3.connect("W:/staff-umbrella/gdicsmoocs/Working copy/scripts/thesis_db")
+    conn = sqlite3.connect(MOOC_DB_LOCATION)
     cur = conn.cursor()
 
     cur.execute("""
@@ -50,7 +54,7 @@ def plot_location_distribution(df):
             pad=0
         )
     )
-    fig.write_image(BASE_URL + "learner_location_distribution.png")
+    fig.write_image(BASE_FIGURE_URL + "learner_location_distribution.png")
 
 def plot_location_distribution_per_course(df):
     for course in df['Course ID'].unique():
@@ -80,7 +84,7 @@ def plot_location_distribution_per_course(df):
                 pad=0
             )
         )
-        fig.write_image(BASE_URL + f"learner_location_distribution_{course_name}.png")
+        fig.write_image(BASE_FIGURE_URL + f"learner_location_distribution_{course_name}.png")
 
 def plot_location_distribution_per_gender(df, graph_name=None):
     men_df = df[df['Gender'] == 'm']
@@ -114,7 +118,7 @@ def plot_location_distribution_per_gender(df, graph_name=None):
         )
     )
     
-    image_location = BASE_URL + f"{graph_name} Men.png" if graph_name else BASE_URL + "learner_location_distribution_men.png"
+    image_location = BASE_FIGURE_URL + f"{graph_name} Men.png" if graph_name else BASE_FIGURE_URL + "learner_location_distribution_men.png"
     fig_men.write_image(image_location)
 
     
@@ -140,7 +144,7 @@ def plot_location_distribution_per_gender(df, graph_name=None):
         )
     )
 
-    image_location = BASE_URL + f"{graph_name} Women.png" if graph_name else "figures/learner_location_distribution_women.png"
+    image_location = BASE_FIGURE_URL + f"{graph_name} Women.png" if graph_name else "figures/learner_location_distribution_women.png"
     fig_women.write_image(image_location)
 
 def plot_location_distribution_per_gender_per_course(df):
@@ -183,7 +187,7 @@ def plot_location_distribution_female_male_ratio(df):
             pad=0
         )
     )
-    fig_ratio.write_image(BASE_URL + "learner_location_female_male_ratio.png")
+    fig_ratio.write_image(BASE_FIGURE_URL + "learner_location_female_male_ratio.png")
 
 def plot_location_distribution_female_male_ratio_per_course(df):
     for course in df['Course ID'].unique():
@@ -221,7 +225,7 @@ def plot_location_distribution_female_male_ratio_per_course(df):
                 pad=0
             )
         )
-        fig_ratio.write_image(BASE_URL + f"learner_location_female_male_ratio_{course_name}.png")
+        fig_ratio.write_image(BASE_FIGURE_URL + f"learner_location_female_male_ratio_{course_name}.png")
 
 def main():
     df = fetch_country_gender_course_id()

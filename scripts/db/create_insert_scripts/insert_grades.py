@@ -1,10 +1,15 @@
-WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy'
-OUTPUT_FOLDER = WORKING_DIR + '/scripts/'
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
+SCRIPTS_DIRECTORY = os.getenv('SCRIPTS_DIRECTORY')
 
 def insert_grades():
     grade_files = find_grade_files()
 
-    with open(OUTPUT_FOLDER + 'insert_grades.sql', 'w', encoding='utf-8') as output:
+    with open(SCRIPTS_DIRECTORY + 'insert_grades.sql', 'w', encoding='utf-8') as output:
         for grade_file in grade_files:
             with open(grade_file, 'r', encoding='utf-8') as f:
                 output.write('INSERT INTO grades (hash_id, course_id, percent_grade, letter_grade, passed_timestamp, created, modified) VALUES\n')
@@ -26,7 +31,7 @@ def insert_grades():
             output.write("\n")
             output.write("ON CONFLICT DO NOTHING;\n\n")
         
-    with open(OUTPUT_FOLDER + 'insert_grades.sql', 'r+', encoding='utf-8') as f:
+    with open(SCRIPTS_DIRECTORY + 'insert_grades.sql', 'r+', encoding='utf-8') as f:
         data = f.read()
         data = data.replace("'NULL'", "NULL")
         f.seek(0)
@@ -37,7 +42,7 @@ def insert_grades():
 def find_grade_files():
     import os
     grade_files = []
-    for root, _, files in os.walk(WORKING_DIR):
+    for root, _, files in os.walk(WORKING_DIRECTORY):
         for file in files:
             if file.endswith("grades_persistentcoursegrade-prod-analytics.sql"):
                 grade_files.append(os.path.join(root, file))
