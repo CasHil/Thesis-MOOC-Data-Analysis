@@ -9,6 +9,7 @@ load_dotenv()
 COURSES = ['EX101x', 'ST1x', 'UnixTx', 'FP101x']
 MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 
+
 def fetch_gender_and_course() -> pd.DataFrame:
     conn = sqlite3.connect(MOOC_DB_LOCATION)
 
@@ -22,11 +23,12 @@ def fetch_gender_and_course() -> pd.DataFrame:
 
     data = cur.fetchall()
     df = pd.DataFrame(data, columns=["Gender", "Course ID"])
-    
+
     cur.close()
     conn.close()
 
     return df
+
 
 def gender_count_per_course(course_df: pd.DataFrame, course_id: str) -> None:
     male_population = course_df[course_df['Gender'] == 'm']
@@ -44,12 +46,14 @@ def gender_count_per_course(course_df: pd.DataFrame, course_id: str) -> None:
     print(f"Number of unknown for course {course_id}: {unknown_count}")
     print(f"Number of other for course {course_id}: {other_count}")
 
+
 def main() -> None:
     df = fetch_gender_and_course()
     df['Course Name'] = df['Course ID'].apply(identify_course)
 
     for COURSE in COURSES:
         gender_count_per_course(df[df["Course Name"] == COURSE], COURSE)
+
 
 if __name__ == '__main__':
     main()

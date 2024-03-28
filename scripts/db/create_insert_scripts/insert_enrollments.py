@@ -13,7 +13,8 @@ def insert_enrollments() -> None:
     with open(SCRIPTS_DIRECTORY + 'insert_enrollments.sql', 'w', encoding='utf-8') as output:
         for enrollment_file in enrollment_files:
             with open(enrollment_file, 'r', encoding='utf-8') as f:
-                output.write('INSERT INTO enrollments (hash_id, course_id, created, is_active, mode) VALUES\n')
+                output.write(
+                    'INSERT INTO enrollments (hash_id, course_id, created, is_active, mode) VALUES\n')
                 for index, line in enumerate(f):
                     if index == 0:
                         continue
@@ -24,20 +25,22 @@ def insert_enrollments() -> None:
                         for i in range(len(data)):
                             if data[i] == '':
                                 data[i] = 'NULL'
-                        
-                        output.write("('{}', '{}', '{}', '{}', '{}'),\n".format(data[0], data[1], data[2], data[3], data[4]))                    
+
+                        output.write("('{}', '{}', '{}', '{}', '{}'),\n".format(
+                            data[0], data[1], data[2], data[3], data[4]))
             # Remove last trailing comma
             output.seek(output.tell() - 3)
             output.write("")
             output.write("\n")
             output.write("ON CONFLICT DO NOTHING;\n\n")
-    
+
     with open(SCRIPTS_DIRECTORY + 'insert_enrollments.sql', 'r+', encoding='utf-8') as f:
         data = f.read()
         data = data.replace("'NULL'", "NULL")
         f.seek(0)
         f.write(data)
         f.truncate()
+
 
 def find_enrollment_files() -> list[str]:
     import os
@@ -48,8 +51,10 @@ def find_enrollment_files() -> list[str]:
                 enrollment_files.append(os.path.join(root, file))
     return enrollment_files
 
+
 def main() -> None:
     insert_enrollments()
+
 
 if __name__ == '__main__':
     main()

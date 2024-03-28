@@ -7,6 +7,7 @@ load_dotenv()
 COURSES = ['EX101x', 'ST1x', 'UnixTx', 'FP101x']
 WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
 
+
 def log_files_to_gz():
     print("Finding log files...")
     log_files = find_log_files()
@@ -18,6 +19,7 @@ def log_files_to_gz():
 
     print("Done")
 
+
 def find_log_files():
     log_files = []
     for root, dirs, files in os.walk(WORKING_DIRECTORY):
@@ -28,8 +30,10 @@ def find_log_files():
                 log_files.append(os.path.join(root, file))
     return log_files
 
+
 def main():
     log_files_to_gz()
+
 
 if __name__ == '__main__':
     main()

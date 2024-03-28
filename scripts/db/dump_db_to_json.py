@@ -8,6 +8,7 @@ load_dotenv()
 MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
 
+
 def dump_db_to_json():
     conn = sqlite3.connect(MOOC_DB_LOCATION)
 
@@ -32,6 +33,7 @@ def dump_db_to_json():
 
     cur.close()
     conn.close()
+
 
 if __name__ == '__main__':
     dump_db_to_json()
