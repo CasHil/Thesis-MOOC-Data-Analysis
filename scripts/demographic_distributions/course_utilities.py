@@ -13,7 +13,7 @@ def identify_course(course_id: str) -> str:
         return 'ST1x'
     elif 'UnixTx' in course_id:
         return 'UnixTx'
-    elif 'EX101x' in course_id:
-        return 'EX101x'
+    elif 'FP101x' in course_id:
+        return 'FP101x'
     else:
-        return 'Other'
+        raise ValueError('Course not found')
