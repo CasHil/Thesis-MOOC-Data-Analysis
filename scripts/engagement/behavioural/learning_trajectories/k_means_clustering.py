@@ -311,8 +311,6 @@ def construct_learner_engagement_mapping(course_elements_df: pd.DataFrame, quiz_
     female_learning_trajectories = {}
 
     for index, course_learner in tqdm(course_learner_df.iterrows(), total=course_learner_df.shape[0]):
-        if index == 10:
-            break
         course_learner_id = course_learner["course_learner_id"]
         gender = get_gender_by_course_learner_id(
             learner_demographic_df, course_learner_id)
@@ -477,7 +475,6 @@ def calculate_k_means_clusters(learner_engagement_mapping: dict[tuple, int], tit
     print(f"\n{title}")
     print(f"Best silhouette score: {best_score:.4f}")
 
-    # Summary of cluster sizes
     print("\nCluster sizes:")
     print(df['cluster'].value_counts().sort_index())
 
@@ -485,7 +482,6 @@ def calculate_k_means_clusters(learner_engagement_mapping: dict[tuple, int], tit
         print(f"\nAverage engagement scores for Cluster {cluster}:")
         print(df[df['cluster'] == cluster].iloc[:, :-1].mean())
 
-    # Visualize the centroids
     plt.figure(figsize=(10, 6))
     for i, centroid in enumerate(centroids):
         plt.plot(centroid, label=f'Cluster {i}', marker='o', linestyle='--')
