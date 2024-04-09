@@ -11,7 +11,7 @@ cycle_charts = []
 webdata_export_file = None
 for file in os.listdir(downloads_path):
     file_path = os.path.join(downloads_path, file)
-    if now - os.path.getmtime(file_path) <= 1000:
+    if now - os.path.getmtime(file_path) <= 24*60*60:
         if file.startswith("cycleChart"):
             cycle_charts.append((file, os.path.getmtime(file_path)))
         elif "webdata_export" in file:
