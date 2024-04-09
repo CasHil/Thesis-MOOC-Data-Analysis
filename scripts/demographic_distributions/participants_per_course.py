@@ -1,17 +1,17 @@
 import sqlite3
 from dotenv import load_dotenv
-import seaborn as sns
-import os
 import pandas as pd
-import matplotlib.pyplot as plt
-import subprocess
+from course_utilities import identify_course
+import os
 
 load_dotenv()
 
-COURSES = ['EX101x', 'ST1x', 'UnixTx']
+COURSES = ['EX101x', 'ST1x', 'UnixTx', 'FP101x']
+MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 
-def fetch_gender_and_course():
-    conn = sqlite3.connect("W:/staff-umbrella/gdicsmoocs/Working copy/scripts/thesis_db")
+
+def fetch_gender_and_course() -> pd.DataFrame:
+    conn = sqlite3.connect(MOOC_DB_LOCATION)
 
     cur = conn.cursor()
 
@@ -23,23 +23,14 @@ def fetch_gender_and_course():
 
     data = cur.fetchall()
     df = pd.DataFrame(data, columns=["Gender", "Course ID"])
-    
+
     cur.close()
     conn.close()
 
     return df
 
-def identify_course(course_id):
-    if 'EX101x' in course_id:
-        return 'EX101x'
-    elif 'ST1x' in course_id:
-        return 'ST1x'
-    elif 'UnixTx' in course_id:
-        return 'UnixTx'
-    else:
-        return 'Other'
 
-def gender_count_per_course(course_df, course_id):
+def gender_count_per_course(course_df: pd.DataFrame, course_id: str) -> None:
     male_population = course_df[course_df['Gender'] == 'm']
     female_population = course_df[course_df['Gender'] == 'f']
     unknown_population = course_df[course_df['Gender'].isnull()]
@@ -55,12 +46,14 @@ def gender_count_per_course(course_df, course_id):
     print(f"Number of unknown for course {course_id}: {unknown_count}")
     print(f"Number of other for course {course_id}: {other_count}")
 
-def main():
+
+def main() -> None:
     df = fetch_gender_and_course()
     df['Course Name'] = df['Course ID'].apply(identify_course)
 
     for COURSE in COURSES:
         gender_count_per_course(df[df["Course Name"] == COURSE], COURSE)
+
 
 if __name__ == '__main__':
     main()

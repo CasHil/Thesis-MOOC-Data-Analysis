@@ -1,7 +1,8 @@
 import os
 import subprocess
 
-def main():
+
+def main() -> None:
     if not os.path.exists('figures'):
         os.makedirs('figures')
 
@@ -9,6 +10,7 @@ def main():
         if script.endswith('.py') and script != 'run_graph_scripts.py':
             print("Running script: ", script)
             subprocess.run(["py", script])
+
 
 if __name__ == '__main__':
     main()

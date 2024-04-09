@@ -1,11 +1,10 @@
 import os
+from dotenv import load_dotenv
 
-WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy/scripts'
-DB_LOCATION = WORKING_DIR + '/thesis_db'
+load_dotenv()
+MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 
-def main():
-    os.remove(DB_LOCATION)
-    print("Database removed")
 
-if __name__ == '__main__':
-    main()
+def remove_db() -> None:
+    os.remove(MOOC_DB_LOCATION)
+    print(f"Database at {MOOC_DB_LOCATION} removed")

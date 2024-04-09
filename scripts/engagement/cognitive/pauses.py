@@ -9,18 +9,21 @@ from scipy.stats import shapiro, levene, ttest_ind, mannwhitneyu, spearmanr
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 import progressbar
+from dotenv import load_dotenv
 
-WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy'
-DB_LOCATION = WORKING_DIR + '/scripts/thesis_db'
+load_dotenv()
+
+WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
+MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 COURSES = ['EX101x', 'ST1x', 'UnixTx']
 
-def find_all_log_files_for_course_id(course_id):
-    return glob.glob(f"{WORKING_DIR}/{course_id}*/*.log", recursive=True)
+def find_all_log_files_for_course_id(course_id: str) -> list[str]:
+    return glob.glob(f"{WORKING_DIRECTORY}/{course_id}*/*.log", recursive=True)
 
-def find_presurvey_files_for_course_id(course_id):
-    return glob.glob(f"{WORKING_DIR}/{course_id}*/pre_survey*.txt", recursive=True)
+def find_presurvey_files_for_course_id(course_id: str) -> list[str]:
+    return glob.glob(f"{WORKING_DIRECTORY}/{course_id}*/pre_survey*.txt", recursive=True)
 
-def find_all_pause_events_for_course_id(course_id):
+def find_all_pause_events_for_course_id(course_id: str) -> list[str]:
     pause_events = []
     bar = progressbar.ProgressBar(maxval=len(find_all_log_files_for_course_id(course_id)), widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
     bar.start()
@@ -34,7 +37,7 @@ def find_all_pause_events_for_course_id(course_id):
                     pause_events.append(line)
     return pause_events
 
-def find_all_pause_events_for_course_id_limit_5(course_id):
+def find_all_pause_events_for_course_id_limit_5(course_id: str) -> list[str]:
     pause_events = []
     for i, log_file in enumerate(find_all_log_files_for_course_id(course_id)):
         if i == 5:
@@ -45,8 +48,8 @@ def find_all_pause_events_for_course_id_limit_5(course_id):
                     pause_events.append(line)
     return pause_events
 
-def find_gender_by_user_id(user_id):
-    con = sqlite3.connect(DB_LOCATION)
+def find_gender_by_user_id(user_id: str) -> str:
+    con = sqlite3.connect(MOOC_DB_LOCATION)
     cur = con.cursor()
     query = 'SELECT gender FROM user_profiles WHERE hash_id = ?'
     cur.execute(query, (user_id,))
@@ -55,8 +58,8 @@ def find_gender_by_user_id(user_id):
         return result[0]
     return None
 
-def calculate_pause_counts(course_id):
-    con = sqlite3.connect(DB_LOCATION)
+def calculate_pause_counts(course_id: str) -> tuple[dict[str, list[int]], dict[str, float], dict[str, int]]:
+    con = sqlite3.connect(MOOC_DB_LOCATION)
     cur = con.cursor()
     pause_events = find_all_pause_events_for_course_id(course_id)
 
@@ -86,7 +89,7 @@ def calculate_pause_counts(course_id):
 
     return gender_pause_counts, gender_pause_averages, user_pause_counts
 
-def graph_average_pauses_per_gender(average_pauses_df):
+def graph_average_pauses_per_gender(average_pauses_df: pd.DataFrame) -> None:
     if not os.path.exists('graphs'):
         os.makedirs('graphs')
     
@@ -105,7 +108,7 @@ def graph_average_pauses_per_gender(average_pauses_df):
 
     g.savefig('graphs/average_pauses_per_gender.png')
 
-def create_average_pause_df(pauses_per_course):
+def create_average_pause_df(pauses_per_course: dict) -> pd.DataFrame:
     rows = []
     for course, genders in pauses_per_course.items():
         for gender, value in genders.items():
@@ -116,7 +119,7 @@ def create_average_pause_df(pauses_per_course):
     df['Gender'] = df['Gender'].map(gender_map)
     return df
 
-def create_pause_count_df(pause_counts, course_id):
+def create_pause_count_df(pause_counts: dict[str, list[int]], course_id: str) -> pd.DataFrame:
     rows = []
     for gender, counts in pause_counts.items():
         for count in counts:
@@ -127,7 +130,7 @@ def create_pause_count_df(pause_counts, course_id):
     df['Gender'] = df['Gender'].map(gender_map)
     return df
 
-def create_user_id_pause_count(pause_counts, course_id):
+def create_user_id_pause_count(pause_counts: dict[str, list[int]], course_id: str) -> pd.DataFrame:
     rows = []
     for user, count in pause_counts.items():
         gender = find_gender_by_user_id(user)
@@ -150,7 +153,7 @@ def create_user_id_pause_count(pause_counts, course_id):
     df = df.merge(pre_survey_accumulated, left_on='User', right_on='hash_id', how='inner')
     return df
 
-def test_correlation_between_video_preferences_and_pauses(df):
+def test_correlation_between_video_preferences_and_pauses(df: pd.DataFrame) -> tuple[float, float]:
     POSSIBLE_ANSWERS = {
         'Not at all important': 1,
         'Slightly important': 2,
@@ -167,7 +170,7 @@ def test_correlation_between_video_preferences_and_pauses(df):
     
     return correlation, p_value
 
-def regression_with_interaction(df):
+def regression_with_interaction(df: pd.DataFrame) -> str:
     df['Q108_1_numeric'] = df['Q108_1'].map({
         'Not at all important': 1,
         'Slightly important': 2,
@@ -185,13 +188,13 @@ def regression_with_interaction(df):
     model = smf.ols('PauseCount ~ Q108_1_numeric * Gender_code', data=df).fit()
     return model.summary()
 
-def descriptive_statistics(df):
+def descriptive_statistics(df: pd.DataFrame) -> pd.DataFrame:
     desc_stats = df.groupby(['Gender'])['PauseCount'].describe(percentiles=[.25, .5, .75])
     desc_stats['IQR'] = desc_stats['75%'] - desc_stats['25%']
     desc_stats['Variance'] = df.groupby(['Gender'])['PauseCount'].var() 
     return desc_stats
 
-def test_normality(df, value_col):
+def test_normality(df: pd.DataFrame, value_col: str) -> dict[str, float]:
     p_values = {}
     for group in df['Gender'].unique():
         group_df = df[df['Gender'] == group][value_col]
@@ -201,24 +204,24 @@ def test_normality(df, value_col):
         p_values[group] = p
     return p_values
 
-def test_homogeneity_of_variances(df, value_col):
+def test_homogeneity_of_variances(df: pd.DataFrame, value_col: str) -> float:
     samples = [group[value_col].values for name, group in df.groupby('Gender')]
     stat, p = levene(*samples)
     return p
 
-def perform_ttest(df, value_col, group1_label, group2_label):
+def perform_ttest(df: pd.DataFrame, value_col: str, group1_label: str, group2_label: str) -> float:
     group1_values = df[df['Gender'] == group1_label][value_col]
     group2_values = df[df['Gender'] == group2_label][value_col]
     t_stat, p_value = ttest_ind(group1_values, group2_values, equal_var=True)
     return p_value
 
-def perform_mannwhitney(df, value_col, group1_label, group2_label):
+def perform_mannwhitney(df: pd.DataFrame, value_col: str, group1_label: str, group2_label: str) -> float:
     group1_values = df[df['Gender'] == group1_label][value_col]
     group2_values = df[df['Gender'] == group2_label][value_col]
     u_stat, p_value = mannwhitneyu(group1_values, group2_values)
     return p_value
 
-def main():
+def main() -> None:
     average_pauses_per_course = {}
     gender_pause_counts_per_course = {}
 

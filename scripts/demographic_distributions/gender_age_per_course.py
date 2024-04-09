@@ -1,15 +1,18 @@
 import sqlite3
 from dotenv import load_dotenv
 import seaborn as sns
-import os
 import pandas as pd
 import matplotlib.pyplot as plt
-import subprocess
+from course_utilities import extract_course_year, calculate_age, identify_course
+import os
 
 load_dotenv()
 
-def fetch_birth_year_gender_course_id():
-    conn = sqlite3.connect("W:/staff-umbrella/gdicsmoocs/Working copy/scripts/thesis_db")
+MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
+
+
+def fetch_birth_year_gender_course_id() -> pd.DataFrame:
+    conn = sqlite3.connect(MOOC_DB_LOCATION)
     cur = conn.cursor()
 
     cur.execute("""
@@ -26,53 +29,43 @@ def fetch_birth_year_gender_course_id():
 
     return df
 
-def extract_course_year(course_id):
-    return int(course_id[-4:])
 
-def calculate_age(course_year, birth_year):
-    return course_year - birth_year
-
-def identify_course(course_id):
-    if 'EX101x' in course_id:
-        return 'EX101x'
-    elif 'ST1x' in course_id:
-        return 'ST1x'
-    elif 'UnixTx' in course_id:
-        return 'UnixTx'
-    else:
-        return 'Other'
-
-def plot_age_distribution(course_df, course_name):
+def plot_age_distribution(course_df: pd.DataFrame, course_name: str):
     male_population = course_df[course_df['Gender'] == 'm']
     female_population = course_df[course_df['Gender'] == 'f']
     unknown_population = course_df[course_df['Gender'].isnull()]
     other_population = course_df[course_df['Gender'] == 'o']
 
     independent_variable = "Age"
-    
+
     sns.set_theme(style="whitegrid")
     colors = sns.color_palette(["#fe9929", "#1f78b4", "#f768a1", "#33a02c"])
     palette = sns.set_palette(colors)
     sns.set_context("notebook", font_scale=1.5, rc={"lines.linewidth": 2.5})
 
     plt.figure(figsize=(12, 8))
-    sns.histplot(male_population, x=independent_variable, binwidth=1, alpha=1.0, label='Male', palette=palette)
-    sns.histplot(female_population, x=independent_variable, binwidth=1, alpha=0.8, label='Female', palette=palette)
-    sns.histplot(unknown_population, x=independent_variable, binwidth=1, alpha=0.5, label='Prefer not to say / Unknown', palette=palette)
-    sns.histplot(other_population, x=independent_variable, binwidth=1, alpha=1.0, label='Other', palette=palette)
+    sns.histplot(male_population, x=independent_variable,
+                 binwidth=1, alpha=1.0, label='Male', palette=palette)
+    sns.histplot(female_population, x=independent_variable,
+                 binwidth=1, alpha=0.8, label='Female', palette=palette)
+    sns.histplot(unknown_population, x=independent_variable, binwidth=1,
+                 alpha=0.5, label='Prefer not to say / Unknown', palette=palette)
+    sns.histplot(other_population, x=independent_variable,
+                 binwidth=1, alpha=1.0, label='Other', palette=palette)
 
-    plt.title(f"Age distribution per gender for {course_name}")    
+    plt.title(f"Age distribution per gender for {course_name}")
     plt.xlabel("Age")
     plt.ylabel("Count")
     plt.tight_layout()
     plt.legend(title='Gender', loc='upper right')
     plt.savefig(f"./figures/age/age_distribution_{course_name}.png")
 
-def main():
 
+def main() -> None:
     df = fetch_birth_year_gender_course_id()
     df['Course Year'] = df['Course ID'].apply(extract_course_year)
-    df['Age'] = df.apply(lambda x: calculate_age(x['Course Year'], x['Birth year']), axis=1)
+    df['Age'] = df.apply(lambda x: calculate_age(
+        x['Course Year'], x['Birth year']), axis=1)
     # Exclude learners older than 99 years
     df = df[df['Age'] < 100]
     df['Course Name'] = df['Course ID'].apply(identify_course)
@@ -80,6 +73,7 @@ def main():
     for course in courses:
         course_df = df[df['Course Name'] == course]
         plot_age_distribution(course_df, course)
+
 
 if __name__ == '__main__':
     main()

@@ -1,73 +1,72 @@
 import sqlite3
 import os
 import subprocess
+from dotenv import load_dotenv
 
-WORKING_DIR = 'W:/staff-umbrella/gdicsmoocs/Working copy/scripts'
-DB_LOCATION = WORKING_DIR + '/thesis_db'
+load_dotenv()
 
-def create_db():
-    if os.path.exists(DB_LOCATION):
-        os.remove(DB_LOCATION)
-    
-    conn = sqlite3.connect(DB_LOCATION)
+SCRIPTS_DIRECTORY = os.getenv('SCRIPTS_DIRECTORY')
+MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
+MOOC_DB_DIRECTORY = os.getenv('MOOC_DB_DIRECTORY')
+
+
+def create_db() -> None:
+    if os.path.exists(MOOC_DB_LOCATION):
+        os.remove(MOOC_DB_LOCATION)
+    else:
+        os.makedirs(MOOC_DB_DIRECTORY)
+
+    conn = sqlite3.connect(MOOC_DB_LOCATION)
+    conn.execute("PRAGMA foreign_keys = ON;")
     cur = conn.cursor()
 
-    with open('thesis_schema.sql', 'r') as schema:
-            cur.executescript(schema.read())
-    
+    with open('mooc_db_schema.sql', 'r') as schema:
+        cur.executescript(schema.read())
+
+    print("Database created successfully.")
+
     conn.commit()
 
     cur.close()
     conn.close()
 
-def insert_demographic_data():
-    conn = sqlite3.connect(DB_LOCATION)
+
+def insert_demographic_data() -> None:
+
+    conn = sqlite3.connect(MOOC_DB_LOCATION)
 
     cur = conn.cursor()
 
-    for script in os.listdir('./create_insert_scripts'):
-        if script.endswith('.py'):
-            print("Running script: ", script)
-            subprocess.run(["py", "./create_insert_scripts/" + script])
-    
-    for sql_file in os.listdir(WORKING_DIR):
+    subprocess.run(["py",  './create_insert_scripts.py'])
+
+    for sql_file in os.listdir(MOOC_DB_DIRECTORY):
         if sql_file.endswith('.sql'):
-            with open(f"{WORKING_DIR}/{sql_file}", 'r', encoding='utf-8') as insert:
-                print(f"Inserting data from {sql_file}")
+            with open(os.path.join(MOOC_DB_DIRECTORY, sql_file), 'r', encoding='utf-8') as insert:
+                print(f"Inserting data from {sql_file}...")
                 cur.executescript(insert.read())
-                    
+
     conn.commit()
 
     cur.close()
     conn.close()
 
-# def insert_log_data():
-#     conn = sqlite3.connect(DB_LOCATION)
 
-#     cur = conn.cursor()
+def insert_metadata() -> None:
+    subprocess.run(["py", "./insert_metadata.py"])
 
-#     for script in os.listdir('./create_insert_scripts'):
-#         if script.endswith('.py'):
-#             print("Running script: ", script)
-#             subprocess.run(["py", "./create_insert_scripts/" + script])
-    
-#     for sql_file in os.listdir(WORKING_DIR):
-#         if sql_file.endswith('.sql'):
-#             with open(f"{WORKING_DIR}/{sql_file}", 'r', encoding='utf-8') as insert:
-#                 print(f"Inserting data from {sql_file}")
-#                 cur.executescript(insert.read())
-                    
-#     conn.commit()
-
-#     cur.close()
-#     conn.close()
 
 def delete_sql_files():
-    for sql_file in os.listdir(WORKING_DIR):
+    for sql_file in os.listdir(SCRIPTS_DIRECTORY):
         if sql_file.endswith('.sql'):
-            os.remove(f'{WORKING_DIR}/{sql_file}')
+            os.remove(f'{SCRIPTS_DIRECTORY}/{sql_file}')
+
 
 if __name__ == '__main__':
-    create_db()
+    recreate_db_response = input("(Re)create database? (Y/N): ")
+    if recreate_db_response == 'Y':
+        create_db()
+
+    insert_metadata()
     insert_demographic_data()
-    delete_sql_files()
+    # Optional
+    # delete_sql_files()
