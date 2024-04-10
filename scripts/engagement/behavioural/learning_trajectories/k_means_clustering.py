@@ -1,6 +1,7 @@
 import re
 from typing import Tuple
 import traceback
+from collections import Counter
 
 import pandas as pd
 import numpy as np
@@ -277,10 +278,34 @@ def get_gender_by_course_learner_id(learner_demographic: pd.DataFrame, course_le
 def construct_learner_engagement_mapping(course_elements_df: pd.DataFrame, quiz_sessions_df: pd.DataFrame, metadata_df: pd.DataFrame, course_learner_df: pd.DataFrame, video_interactions_df: pd.DataFrame, submissions_df: pd.DataFrame, ora_sessions_df: pd.DataFrame, learner_demographic_df: pd.DataFrame) -> tuple[dict[tuple, int], dict[tuple, int]]:
     course_start_date = pd.Timestamp(metadata_df["object"]["start_date"])
     course_end_date = pd.Timestamp(metadata_df["object"]["end_date"])
-    due_dates: dict[str, str] = metadata_df["object"]["element_time_map_due"]
-    due_dates = {key: pd.Timestamp(value) for key, value in due_dates.items()}
-    child_parent_map: dict[str,
-                           str] = metadata_df["object"]["child_parent_map"]
+    due_dates = {key: pd.Timestamp(
+        value) for key, value in metadata_df["object"]["element_time_map_due"].items()}
+    child_parent_map = metadata_df["object"]["child_parent_map"]
+
+    for element in list(due_dates):
+        if "sequential" in element:
+            element_children = {
+                key: due_dates[element] for key in child_parent_map if child_parent_map[key] == element}
+            del due_dates[element]
+            due_dates.update(element_children)
+
+    course_element_ids_set = set(course_elements_df["element_id"])
+
+    male_learning_trajectories = Counter()
+    female_learning_trajectories = Counter()
+
+    course_learner_df['gender'] = course_learner_df['course_learner_id'].apply(
+        lambda id: get_gender_by_course_learner_id(learner_demographic_df, id))
+
+    valid_course_learner_ids = set(course_learner_df['course_learner_id'])
+    video_interactions_df = video_interactions_df[video_interactions_df['course_learner_id'].isin(
+        valid_course_learner_ids)]
+    quiz_sessions_df = quiz_sessions_df[quiz_sessions_df['course_learner_id'].isin(
+        valid_course_learner_ids)]
+    ora_sessions_df = ora_sessions_df[ora_sessions_df['course_learner_id'].isin(
+        valid_course_learner_ids)]
+    submissions_df = submissions_df[submissions_df['course_learner_id'].isin(
+        valid_course_learner_ids)]
 
     flattened_due_dates: dict = due_dates.copy()
     for element in due_dates:
@@ -289,6 +314,8 @@ def construct_learner_engagement_mapping(course_elements_df: pd.DataFrame, quiz_
                 key: due_dates[element] for key in child_parent_map if child_parent_map[key] == element}
             del flattened_due_dates[element]
             flattened_due_dates = flattened_due_dates | element_children
+
+    flattened_due_dates_series = pd.Series(flattened_due_dates)
 
     due_dates_per_assessment_period: pd.Series = get_due_dates_per_assessment_period(
         flattened_due_dates, course_start_date)
@@ -305,10 +332,6 @@ def construct_learner_engagement_mapping(course_elements_df: pd.DataFrame, quiz_
     auditing = "A"
     # Out if no elements have been completed, and there are no video interactions or quiz sessions.
     out = "O"
-
-    assessment_period_start_date = course_start_date
-    male_learning_trajectories = {}
-    female_learning_trajectories = {}
 
     for index, course_learner in tqdm(course_learner_df.iterrows(), total=course_learner_df.shape[0]):
         course_learner_id = course_learner["course_learner_id"]
@@ -328,25 +351,29 @@ def construct_learner_engagement_mapping(course_elements_df: pd.DataFrame, quiz_
         learner_ora_sessions = ora_sessions_df[ora_sessions_df["course_learner_id"]
                                                == course_learner_id]
 
-        if not learner_quiz_sessions.empty or not learner_ora_sessions.empty or not learner_submissions.empty:
-            print("Has sessions")
+        has_submissions = not submissions_df[submissions_df['course_learner_id']
+                                             == course_learner_id].empty
+        has_video_interactions = not video_interactions_df[
+            video_interactions_df['course_learner_id'] == course_learner_id].empty
+        has_quiz_sessions = not quiz_sessions_df[quiz_sessions_df['course_learner_id']
+                                                 == course_learner_id].empty
+        has_ora_sessions = not ora_sessions_df[ora_sessions_df['course_learner_id']
+                                               == course_learner_id].empty
 
-        if learner_submissions.empty and learner_video_interactions.empty and learner_quiz_sessions.empty and learner_ora_sessions.empty:
+        if not has_submissions and not has_video_interactions and not has_quiz_sessions and not has_ora_sessions:
             out_learning_trajectories = tuple(
                 [out for _ in range(len(due_dates_per_assessment_period))])
             if gender == "m":
-                male_learning_trajectories[out_learning_trajectories] = male_learning_trajectories.get(
-                    out_learning_trajectories, 0) + 1
+                male_learning_trajectories[out_learning_trajectories] += 1
             elif gender == "f":
-                female_learning_trajectories[out_learning_trajectories] = female_learning_trajectories.get(
-                    out_learning_trajectories, 0) + 1
+                female_learning_trajectories[out_learning_trajectories] += 1
             continue
 
         # Elements in that have been completed on time
-        completed_elements = []
+        elements_completed_on_time = set()
 
         # Elements that have been completed after the due date of the assessment period
-        late_elements = []
+        elements_completed_late = set()
 
         # Video interactions per assessment period. Does not have to be by the assessment period's due date.
         has_watched_video_in_assessment_period = set()
@@ -354,7 +381,7 @@ def construct_learner_engagement_mapping(course_elements_df: pd.DataFrame, quiz_
         learner_engagement = pd.Series([None for _ in range(
             len(due_dates_per_assessment_period))])
 
-        if not learner_submissions.empty or not learner_ora_sessions.empty or not learner_quiz_sessions.empty:
+        if has_submissions or has_ora_sessions or has_quiz_sessions:
             for assessment_period, elements_due in due_dates_per_assessment_period.items():
 
                 week_submissions = get_learner_submissions_per_assessment_period(
@@ -365,41 +392,54 @@ def construct_learner_engagement_mapping(course_elements_df: pd.DataFrame, quiz_
                     learner_ora_sessions, assessment_period)
 
                 for element in elements_due:
-                    if (not week_submissions.empty and any([element in submission["question_id"] for _, submission in week_submissions.iterrows()])) \
-                        or (not week_ora_sessions.empty and any([ora_session["assessment_id"] in element for _, ora_session in week_ora_sessions.iterrows()])) \
-                            or (not week_quiz_sessions.empty and any([element in quiz_session["sessionId"] for _, quiz_session in week_quiz_sessions.iterrows()])):
-                        completed_elements.append(element)
+                    element_in_week_submissions = any(
+                        week_submissions['question_id'].str.contains(element))
+                    element_in_week_ora_sessions = any(
+                        week_ora_sessions['assessment_id'] == element)
+                    element_in_week_quiz_sessions = any(
+                        week_quiz_sessions['sessionId'] == element)
+                    if element_in_week_submissions or element_in_week_ora_sessions or element_in_week_quiz_sessions:
+                        elements_completed_on_time.add(element)
                         continue
 
-                    if (not learner_submissions.empty and any([element in submission["question_id"] for _, submission in learner_submissions.iterrows()])) \
-                        or (not learner_ora_sessions.empty and any([ora_session["assessment_id"] in element for _, ora_session in learner_ora_sessions.iterrows()])) \
-                            or (not learner_quiz_sessions.empty and any([element in quiz_session["sessionId"] for _, quiz_session in learner_quiz_sessions.iterrows()])):
-                        if flattened_due_dates[element] < assessment_period.right:
-                            completed_elements.append(element)
-                        else:
-                            late_elements.append(element)
+                    element_in_all_submissions = any(
+                        learner_submissions['question_id'].str.contains(element))
+                    element_in_all_ora_sessions = any(
+                        learner_ora_sessions['assessment_id'] == element)
+                    element_in_all_quiz_sessions = any(
+                        learner_quiz_sessions['sessionId'] == element)
 
-        if not learner_video_interactions.empty:
-            for _, video_interaction in learner_video_interactions.iterrows():
-                video_id = video_interaction["video_id"]
-                chapter_start_time = get_chapter_start_time_by_video_id(
-                    metadata_df, video_id)
-                video_added = False
-                for assessment_period, _ in due_dates_per_assessment_period.items():
-                    if assessment_period.left == chapter_start_time:
-                        has_watched_video_in_assessment_period.add(
-                            assessment_period)
-                        video_added = True
-                        break
-                if video_added:
-                    continue
+                    if element_in_all_submissions or element_in_all_ora_sessions or element_in_all_quiz_sessions:
+                        if flattened_due_dates_series.get(element, pd.Timestamp.max) < assessment_period.right:
+                            elements_completed_on_time.add(element)
+                        else:
+                            elements_completed_late.add(element)
+
+        if has_video_interactions:
+            learner_video_interactions = learner_video_interactions.copy()
+            learner_video_interactions['chapter_start_time'] = learner_video_interactions['video_id'].apply(
+                lambda x: get_chapter_start_time_by_video_id(metadata_df, x))
+            chapter_to_assessment_period = {
+                period.left: period for period in due_dates_per_assessment_period.index}
+
+            learner_video_interactions['assessment_period'] = learner_video_interactions['chapter_start_time'].map(
+                chapter_to_assessment_period)
+            valid_video_interactions = learner_video_interactions.dropna(
+                subset=['assessment_period'])
+            has_watched_video_in_assessment_period.update(
+                valid_video_interactions['assessment_period'].unique())
+
+        all_completed_elements = elements_completed_on_time.union(
+            elements_completed_late)
 
         for idx, assessment_period in enumerate(due_dates_per_assessment_period.index):
-            if all(element in completed_elements for element in due_dates_per_assessment_period[assessment_period]):
+            period_elements = set(
+                due_dates_per_assessment_period[assessment_period])
+            if period_elements.issubset(elements_completed_on_time):
                 learner_engagement[idx] = on_track
-            elif all(element in completed_elements or element in late_elements for element in course_elements_df["element_id"]):
+            elif period_elements.issubset(all_completed_elements):
                 learner_engagement[idx] = behind
-            elif any(element in completed_elements for element in course_elements_df["element_id"]) or assessment_period in has_watched_video_in_assessment_period:
+            elif not period_elements.isdisjoint(all_completed_elements) or assessment_period in has_watched_video_in_assessment_period:
                 learner_engagement[idx] = auditing
             else:
                 learner_engagement[idx] = out
@@ -407,11 +447,9 @@ def construct_learner_engagement_mapping(course_elements_df: pd.DataFrame, quiz_
         learner_engagement_tuple = tuple(learner_engagement)
 
         if gender == "m":
-            male_learning_trajectories[learner_engagement_tuple] = male_learning_trajectories.get(
-                learner_engagement_tuple, 0) + 1
+            male_learning_trajectories[learner_engagement_tuple] += 1
         elif gender == "f":
-            female_learning_trajectories[learner_engagement_tuple] = female_learning_trajectories.get(
-                learner_engagement_tuple, 0) + 1
+            female_learning_trajectories[learner_engagement_tuple] += 1
 
     return male_learning_trajectories, female_learning_trajectories
 
