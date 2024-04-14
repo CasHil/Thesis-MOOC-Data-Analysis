@@ -57,9 +57,6 @@ def has_due_dates(metadata: pd.DataFrame) -> bool:
             has_due_dates = True
             break
 
-    if not has_due_dates:
-        raise ValueError(
-            f"Course {metadata["object"]["course_name"]} does not have assignments with due dates.")
     return has_due_dates
 
 
@@ -131,6 +128,8 @@ def get_submissions(db: Database, course_id: str) -> pd.DataFrame:
 
     submissions_df['submission_timestamp'] = pd.to_datetime(
         submissions_df['submission_timestamp'])
+    
+    submissions_df = submissions_df.drop(columns=['_id'])
     return submissions_df
 
 
@@ -163,7 +162,8 @@ def get_video_interactions(db: Database, course_id: str) -> pd.DataFrame:
         video_interactions_df['start_time'])
     video_interactions_df['end_time'] = pd.to_datetime(
         video_interactions_df['end_time'])
-
+    
+    video_interactions_df = video_interactions_df.drop(columns=['_id', 'type', 'watch_duration', 'times_forward_seek', 'duration_forward_seek', 'times_backward_seek', 'duration_backward_seek', 'times_speed_up', 'times_speed_down', 'times_pause', 'duration_pause'])
     return downcast_numeric_columns(video_interactions_df)
 
 
@@ -193,7 +193,8 @@ def get_course_learner(db: Database, course_id: str) -> pd.DataFrame:
 
     if course_learners_df.empty:
         raise ValueError(f"No course learners found for course {course_id}")
-
+    
+    course_learners_df = course_learners_df.drop(columns=['_id', 'final_grade', 'enrollment_mode', 'certificate_status', 'register_time', 'group_type', 'group_name', 'segment'])
     return course_learners_df
 
 
@@ -210,13 +211,19 @@ def get_ora_sessions(db: Database, course_id: str) -> pd.DataFrame:
     if ora_sessions_df.empty:
         print(
             f"No ORA sessions found for course {course_id}")
-        return pd.DataFrame()
+        ora_sessions_df['start_time'] = None
+        ora_sessions_df['end_time'] = None
+        ora_sessions_df['sessionId'] = None
+        ora_sessions_df['course_learner_id'] = None
+
+        return ora_sessions_df
 
     ora_sessions_df['start_time'] = pd.to_datetime(
         ora_sessions_df['start_time'])
     ora_sessions_df['end_time'] = pd.to_datetime(
         ora_sessions_df['end_time'])
-
+    
+    ora_sessions_df = ora_sessions_df.drop(columns=['_id', 'times_save', 'times_peer_assess', 'submitted', 'self_assessed', 'assessment_id'])
     return downcast_numeric_columns(ora_sessions_df)
 
 
@@ -236,7 +243,7 @@ def get_videos_per_assessment_period(learner_video_interactions: pd.DataFrame, a
     return learner_video_interactions[within_period]
 
 
-def engagement_by_submissions(submissions_by_learner: pd.DataFrame, due_dates_per_assessment_period: pd.Series, learner_id: str) -> pd.Series:
+def engagement_by_submissions(submissions_by_learner: pd.DataFrame, due_dates_per_assessment_period: pd.Series, assessment_periods: list[pd.Interval], learner_id: str) -> Tuple[str]:
     submissions_for_learner = submissions_by_learner[
         submissions_by_learner['course_learner_id'] == learner_id]
 
@@ -244,35 +251,39 @@ def engagement_by_submissions(submissions_by_learner: pd.DataFrame, due_dates_pe
     elements_completed_late = set()
     engagement = pd.Series()
 
-    for idx, assessment_period in enumerate(due_dates_per_assessment_period.index):
+    for assessment_period in assessment_periods:
         elements_due_in_period = set(
-            due_dates_per_assessment_period[assessment_period])
-
+            due_dates_per_assessment_period.get(assessment_period, []))
         # If there are no submissions due, it should not count for the learner's engagement
         if not any(["problem+block@" in element for element in elements_due_in_period]):
+            engagement[assessment_period] = ""
             continue
         period_submissions = get_learner_submissions_per_assessment_period(
             submissions_for_learner, assessment_period)
         for element in elements_due_in_period:
             element_in_period_submissions = any(
                 period_submissions['question_id'].str.contains(element))
+            element_in_all_submissions = any(
+                submissions_for_learner['question_id'].str.contains(element))
+    
             if element_in_period_submissions:
                 elements_completed_on_time.add(element)
-            else:
+            elif element_in_all_submissions:
                 elements_completed_late.add(element)
 
         if elements_due_in_period.issubset(elements_completed_on_time):
-            engagement[idx] = "T"
+            engagement[assessment_period] = "T"
         elif elements_due_in_period.issubset(elements_completed_on_time.union(elements_completed_late)):
-            engagement[idx] = "B"
+            engagement[assessment_period] = "B"
         elif not elements_due_in_period.isdisjoint(elements_completed_on_time.union(elements_completed_late)):
-            engagement[idx] = "A"
+            engagement[assessment_period] = "A"
         else:
-            engagement[idx] = "O"
-    return engagement
+            engagement[assessment_period] = "O"
+    engagement = engagement.sort_index()
+    return tuple(engagement.values)
 
 
-def engagement_by_video_interactions(video_interactions: pd.DataFrame, due_dates_per_assessment_period: pd.Series, metadata_df: pd.DataFrame, learner_id: str) -> pd.Series:
+def engagement_by_video_interactions(video_interactions: pd.DataFrame, due_dates_per_assessment_period: pd.Series, metadata_df: pd.DataFrame, assessment_periods: list[pd.Interval], learner_id: str) -> pd.Series:
     video_interactions_copy = \
         video_interactions[video_interactions['course_learner_id']
                            == learner_id].copy()
@@ -292,13 +303,20 @@ def engagement_by_video_interactions(video_interactions: pd.DataFrame, due_dates
     has_watched_video_in_assessment_period.update(
         valid_video_interactions['assessment_period'].unique())
 
-    for assessment_period in has_watched_video_in_assessment_period:
-        engagement[assessment_period] = "A"
+    for assessment_period in assessment_periods:
+        if assessment_period in has_watched_video_in_assessment_period:
+            engagement[assessment_period] = "A"
+        else:
+            engagement[assessment_period] = ""
 
-    return engagement
+    engagement = engagement.sort_index()
+    return tuple(engagement.values)
 
 
-def engagement_by_quiz_sessions(quiz_sessions: pd.DataFrame, quizzes_due_per_assessment_period: pd.Series, learner_id: str) -> pd.Series:
+def engagement_by_quiz_sessions(quiz_sessions: pd.DataFrame, quizzes_due_per_assessment_period: pd.Series, assessment_periods: list[pd.Interval], learner_id: str) -> Tuple[str]:
+    if not learner_id == "course-v1:DelftX+EX101x+3T2015_4f51ab1f44e5a496e86dfff703efad2d":
+        return tuple()
+
     quiz_sessions_for_learner = quiz_sessions[quiz_sessions['course_learner_id'] == learner_id]
     assessment_periods_with_all_quizzes_on_time = set()
     assessment_periods_with_all_quizzes_late_or_on_time = set()
@@ -307,35 +325,34 @@ def engagement_by_quiz_sessions(quiz_sessions: pd.DataFrame, quizzes_due_per_ass
     engagement = pd.Series()
 
     for assessment_period, elements_due in quizzes_due_per_assessment_period.items():
+        if not elements_due:
+            engagement[assessment_period] = ""
+            continue
+        
         quiz_sessions_in_period = get_learner_quiz_sessions_per_assessment_period(
             quiz_sessions_for_learner, assessment_period)
-        all_quizzes_done_on_time = True
-        all_quizzes_done = True
-        some_quizzes_done = False
+        quizzes_done_on_time = 0
+        quizzes_done = 0
         for element in elements_due:
             element_in_period_quiz_sessions = any(
                 quiz_sessions_in_period['sessionId'].str.contains(element))
-            if not element_in_period_quiz_sessions:
-                all_quizzes_done_on_time = False
-                continue
-            else:
-                some_quizzes_done = True
+            if element_in_period_quiz_sessions:
+                quizzes_done_on_time += 1
 
             element_in_all_quiz_sessions = any(
                 quiz_sessions_for_learner['sessionId'].str.contains(element))
-            if not element_in_all_quiz_sessions:
-                all_quizzes_done = False
-            else:
-                some_quizzes_done = True
-        if all_quizzes_done_on_time:
+            # Find if there is any quiz sesssion for the element with an end time before 
+            if element_in_all_quiz_sessions:
+                quizzes_done += 1
+        if quizzes_done_on_time == len(elements_due):
             assessment_periods_with_all_quizzes_on_time.add(assessment_period)
-        elif all_quizzes_done:
+        elif quizzes_done_on_time + quizzes_done == len(elements_due):
             assessment_periods_with_all_quizzes_late_or_on_time.add(
                 assessment_period)
-        elif some_quizzes_done:
+        elif quizzes_done_on_time + quizzes_done > 0:
             assessment_periods_with_some_quizzes_done.add(assessment_period)
 
-    for assessment_period in quizzes_due_per_assessment_period.index:
+    for assessment_period in assessment_periods:
         if assessment_period in assessment_periods_with_all_quizzes_on_time:
             engagement[assessment_period] = "T"
         elif assessment_period in assessment_periods_with_all_quizzes_late_or_on_time:
@@ -344,13 +361,14 @@ def engagement_by_quiz_sessions(quiz_sessions: pd.DataFrame, quizzes_due_per_ass
             engagement[assessment_period] = "A"
         elif quizzes_due_per_assessment_period.get(assessment_period, None) is not None:
             engagement[assessment_period] = "O"
+        # Should never be reached
         else:
-            engagement[assessment_period] = None
+            raise ValueError("Error in quiz engagement calculation")
+    engagement = engagement.sort_index()
+    return tuple(engagement.values)
 
-    return engagement
 
-
-def engagement_by_ora_sessions(ora_sessions: pd.DataFrame, due_dates_per_assessment_period: pd.Series, learner_id: str) -> pd.Series:
+def engagement_by_ora_sessions(ora_sessions: pd.DataFrame, due_dates_per_assessment_period: pd.Series, assessment_periods: list[pd.Interval], learner_id: str) -> Tuple[str]:
     ora_sessions_for_learner = ora_sessions[ora_sessions['course_learner_id'] == learner_id]
     ora_due_dates_per_assessment_period = due_dates_per_assessment_period.apply(
         lambda elements: [element for element in elements if "openassessment" in element])
@@ -375,7 +393,7 @@ def engagement_by_ora_sessions(ora_sessions: pd.DataFrame, due_dates_per_assessm
             else:
                 some_oras_done = True
             element_in_all_ora_sessions = any(
-                ora_sessions_for_learner['assessment_id'].str.contains(element))
+                ora_sessions_for_learner['sessionId'].str.contains(element))
             if not element_in_all_ora_sessions:
                 all_oras_done = False
             else:
@@ -388,19 +406,20 @@ def engagement_by_ora_sessions(ora_sessions: pd.DataFrame, due_dates_per_assessm
         elif some_oras_done:
             assessment_periods_with_some_oras_done.add(assessment_period)
 
-    for idx, assessment_period in enumerate(ora_due_dates_per_assessment_period.index):
+    for assessment_period in assessment_periods:
         if assessment_period in assessment_periods_with_all_oras_on_time:
-            engagement[idx] = "T"
+            engagement[assessment_period] = "T"
         elif assessment_period in assessment_periods_with_all_oras_late_or_on_time:
-            engagement[idx] = "B"
+            engagement[assessment_period] = "B"
         elif assessment_period in assessment_periods_with_some_oras_done:
-            engagement[idx] = "A"
+            engagement[assessment_period] = "A"
         elif ora_due_dates_per_assessment_period.get(assessment_period, None) is not None:
-            engagement[idx] = "O"
+            engagement[assessment_period] = "O"
         else:
-            engagement[idx] = None
+            engagement[assessment_period] = ""
 
-    return engagement
+    engagement = engagement.sort_index()
+    return tuple(engagement.values)
 
 
 def construct_learner_engagement_mapping(quiz_sessions_df: pd.DataFrame, metadata_df: pd.DataFrame, course_learner_df: pd.DataFrame, video_interactions_df: pd.DataFrame, submissions_df: pd.DataFrame, ora_sessions_df: pd.DataFrame, learner_demographic_df: pd.DataFrame) -> Tuple[Counter[tuple, int], Counter[tuple, int]]:
@@ -436,39 +455,48 @@ def construct_learner_engagement_mapping(quiz_sessions_df: pd.DataFrame, metadat
         lambda elements: [element for element in elements if "problem+block" in element] or None).dropna()
     ora_due_per_assessment_period = due_dates_per_assessment_period.apply(
         lambda elements: [element for element in elements if "openassessment" in element] or None).dropna()
-
+    
+    assessment_periods = due_dates_per_assessment_period.index
     tqdm.pandas()
 
     course_learner_df['quiz_engagement'] = course_learner_df['course_learner_id'].progress_apply(
-        lambda learner_id: engagement_by_quiz_sessions(quiz_sessions_df, quizzes_due_per_assessment_period, learner_id))
+        lambda learner_id: engagement_by_quiz_sessions(quiz_sessions_df, quizzes_due_per_assessment_period, assessment_periods, learner_id))
+    print(course_learner_df.head())
     course_learner_df['video_engagement'] = course_learner_df['course_learner_id'].progress_apply(
-        lambda learner_id: engagement_by_video_interactions(video_interactions_df, due_dates_per_assessment_period, metadata_df, learner_id))
+        lambda learner_id: engagement_by_video_interactions(video_interactions_df, due_dates_per_assessment_period, metadata_df, assessment_periods, learner_id))
+    print(course_learner_df.head())
+    
     course_learner_df['submission_engagement'] = course_learner_df['course_learner_id'].progress_apply(
-        lambda learner_id: engagement_by_submissions(submissions_df, submissions_due_per_assessment_period, learner_id))
+        lambda learner_id: engagement_by_submissions(submissions_df, submissions_due_per_assessment_period, assessment_periods, learner_id))
+    print(course_learner_df.head())
+    
     course_learner_df['ora_engagement'] = course_learner_df['course_learner_id'].progress_apply(
-        lambda learner_id: engagement_by_ora_sessions(ora_sessions_df, ora_due_per_assessment_period, learner_id))
+        lambda learner_id: engagement_by_ora_sessions(ora_sessions_df, ora_due_per_assessment_period, assessment_periods, learner_id))
+    print(course_learner_df.head())
 
     course_learner_df['engagement'] = course_learner_df.progress_apply(
         lambda row: process_engagement(row['quiz_engagement'], row['video_engagement'], row['submission_engagement'], row['ora_engagement'], due_dates_per_assessment_period
                                        ), axis=1)
+    print(course_learner_df.head())
 
-    male_counts = Counter(course_learner_df[course_learner_df['gender']
-                                            == 'm']['engagement'].value_counts())
-    female_counts = Counter(course_learner_df[course_learner_df['gender']
-                                              == 'f']['engagement'].value_counts())
+    male_counts = course_learner_df[course_learner_df['gender']
+                                            == 'm']['engagement'].value_counts()
+    print(male_counts)
+    female_counts = course_learner_df[course_learner_df['gender']
+                                              == 'f']['engagement'].value_counts()
 
     return male_counts, female_counts
 
 
-def process_engagement(quiz_engagement: pd.Series, video_engagement: pd.Series, submission_engagement: pd.Series, ora_engagement: pd.Series, assessment_periods: pd.Series) -> pd.Series:
-    engagement = pd.Series()
-    for assessment_period in assessment_periods:
-        quiz_engagement_for_period = quiz_engagement.get(assessment_period, "")
-        video_engagement_for_period = video_engagement.get(
-            assessment_period, "")
-        submission_engagement_for_period = submission_engagement.get(
-            assessment_period, "")
-        ora_engagement_for_period = ora_engagement.get(assessment_period, "")
+def process_engagement(quiz_engagement: tuple[str], video_engagement: tuple[str], submission_engagement: tuple[str], ora_engagement: tuple[str], assessment_periods: tuple[str]) -> tuple[str]:
+    engagement = tuple()
+    assert len(quiz_engagement) == len(video_engagement) == len(submission_engagement) == len(ora_engagement) == len(assessment_periods)
+
+    for idx, assessment_periods in enumerate(assessment_periods):
+        quiz_engagement_for_period = quiz_engagement[idx]
+        video_engagement_for_period = video_engagement[idx]
+        submission_engagement_for_period = submission_engagement[idx]
+        ora_engagement_for_period = ora_engagement[idx]
 
         non_video_statuses = set([quiz_engagement_for_period,
                                   submission_engagement_for_period, ora_engagement_for_period])
@@ -477,24 +505,26 @@ def process_engagement(quiz_engagement: pd.Series, video_engagement: pd.Series, 
 
         # Rule 1: If any status is 'A', return 'A'
         if "A" in non_video_statuses:
-            return "A"
+            engagement += ("A",)
         # Rule 2: If it's a mix of 'T' and 'B', or just 'B', return 'B'
         elif "B" in non_video_statuses and non_video_statuses == {"T", "B"}:
-            return "B"
+            engagement += ("B",)
         # Rule 3: If all are 'T', return 'T'
         elif non_video_statuses == {"T"}:
-            return "T"
+            engagement += ("T",)
         # Rule 4: If all non-video engagements are "", check video engagement
         elif not non_video_statuses:
             # If video_engagement is 'A', return 'A'. Otherwise, return 'O' since video_engagement can only be 'A' or 'O'.
-            return video_engagement_for_period if video_engagement_for_period == "A" else "O"
+            engagement += ("A" if video_engagement_for_period == "A" else "O",)
         # Default case to catch any unforeseen combinations, primarily for safety
-        return "O"
+        engagement += ("O",)
 
     return engagement
 
 
 def get_learner_quiz_sessions_per_assessment_period(learner_quiz_sessions: pd.DataFrame, assessment_period: pd.Interval) -> pd.Series:
+    if not learner_quiz_sessions.empty:
+        print(learner_quiz_sessions)
     within_period = learner_quiz_sessions['end_time'].between(
         assessment_period.left, assessment_period.right)
     return learner_quiz_sessions[within_period]
@@ -523,15 +553,14 @@ def get_due_dates_per_assessment_period(element_time_map_due: dict, course_start
     return periods_with_due_dates
 
 
-def engagement_to_numeric(engagement: tuple) -> list:
+def engagement_to_numeric(engagement: pd.Series) -> list:
     label_to_numeric = {'T': 3, 'B': 2, 'A': 1, 'O': 0}
     return [label_to_numeric[label] for label in engagement]
 
 
-def calculate_k_means_clusters(learner_engagement_mapping: Counter[tuple, int], title: str) -> None:
+def calculate_k_means_clusters(learner_engagement_mapping: pd.Series, title: str) -> None:
     engagement_numeric = [engagement_to_numeric(
         pattern) for pattern in learner_engagement_mapping.keys()]
-    print(engagement_numeric)
     X = np.array(engagement_numeric)
 
     best_score = -1
@@ -574,10 +603,7 @@ def calculate_k_means_clusters(learner_engagement_mapping: Counter[tuple, int], 
 
 def get_quiz_sessions(db: Database, course_id: str) -> pd.DataFrame:
     quiz_sessions_query = {
-        "course_learner_id": {
-            "$regex": course_id,
-            "$options": "i"
-        }
+        "course_id": course_id
     }
     quiz_sessions = db["quiz_sessions"].find(quiz_sessions_query)
     quiz_sessions_df = pd.DataFrame(quiz_sessions)
@@ -598,27 +624,33 @@ def get_quiz_sessions(db: Database, course_id: str) -> pd.DataFrame:
 def main() -> None:
     client = MongoClient("mongodb://localhost:27017/")
     print("Connected to MongoDB")
-    db = client["edx_testing"]
+    db = client["edx_test"]
 
     courses = get_courses(db)
 
     for _, course in courses.iterrows():
         try:
             full_course_id = course["course_id"]
+            mooc_id = full_course_id.split("+")[-2]
+            course_run = full_course_id.split("+")[-1]
+            course_id_with_course_run = f"{mooc_id}_{course_run}"
+            pattern = r"(\w+_\d+T)_(\d{4})"
+            if re.match(pattern, course_id_with_course_run):
+                course_id_with_course_run = re.sub(pattern, r"\1\2", course_id_with_course_run)
             escaped_course_id = escape_id(full_course_id)
-            mooc_id = escaped_course_id.split("+")[-2]
-            course_run = escaped_course_id.split("+")[-1]
-            course_id = f"{mooc_id}_{course_run}"
-            metadata = get_metadata(db, course_id)
 
+            metadata = get_metadata(db, course_id_with_course_run)
+            # course_id quiz sessions: "course-v1:DelftX+EX101x+2T2018"
+            #metadata: EX101x_3T2015_run2
             if not has_due_dates(metadata):
-                raise ValueError("Course does not have due dates.")
+                # raise ValueError("Course does not have due dates.")
+                continue
 
             submissions = get_submissions(db, escaped_course_id)
             print("Submissions done")
             video_interactions = get_video_interactions(db, escaped_course_id)
             print("Video interactions done")
-            quiz_sessions = get_quiz_sessions(db, escaped_course_id)
+            quiz_sessions = get_quiz_sessions(db, "course-v1:DelftX+" + "+".join(course_id_with_course_run.split("_")[:2])) 
             print("Quiz sessions done")
             course_learner = get_course_learner(db, escaped_course_id)
             ora_sessions = get_ora_sessions(db, escaped_course_id)
@@ -649,14 +681,17 @@ def main() -> None:
             if not course_learner.empty:
                 course_learner = course_learner[course_learner['course_learner_id'].isin(
                     filtered_ids)]
+                
+            # filter course_learner to the first 500
+            # course_learner = course_learner.head(500)
 
             print("All data loaded")
             male_learner_engagement_mapping, female_learner_engagement_mapping = construct_learner_engagement_mapping(quiz_sessions, metadata,
                                                                                                                       course_learner, video_interactions, submissions, ora_sessions, filtered_learners)
             calculate_k_means_clusters(
-                male_learner_engagement_mapping, course_id)
+                male_learner_engagement_mapping, full_course_id)
             calculate_k_means_clusters(
-                female_learner_engagement_mapping, course_id)
+                female_learner_engagement_mapping, full_course_id)
 
         except Exception as ex:
             print(''.join(traceback.format_exception(type(ex),
