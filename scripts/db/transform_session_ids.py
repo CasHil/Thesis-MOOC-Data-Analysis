@@ -2,10 +2,10 @@ from pymongo import MongoClient
 from tqdm import tqdm
 
 client = MongoClient('mongodb://localhost:27017/')
-db = client.edx_test
+db = client["edx_testing"]
 collection = db.quiz_sessions
-
-for document in tqdm(collection.find()):
+total_documents = collection.count_documents({})
+for document in tqdm(collection.find(), total=total_documents):
     session_id = document.get("sessionId", "")
     course_learner_id = document.get("course_learner_id", "")
     try:
