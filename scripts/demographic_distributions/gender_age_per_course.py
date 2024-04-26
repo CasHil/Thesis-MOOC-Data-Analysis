@@ -33,8 +33,41 @@ def fetch_birth_year_gender_course_id() -> pd.DataFrame:
 def plot_age_distribution(course_df: pd.DataFrame, course_name: str):
     male_population = course_df[course_df['Gender'] == 'm']
     female_population = course_df[course_df['Gender'] == 'f']
-    unknown_population = course_df[course_df['Gender'].isnull()]
-    other_population = course_df[course_df['Gender'] == 'o']
+
+    male_and_female_population = course_df[
+        (course_df['Gender'] == 'm') | (course_df['Gender'] == 'f')]
+    standard_deviation = male_and_female_population['Age'].std()
+    average = male_and_female_population['Age'].mean()
+    median = male_and_female_population['Age'].median()
+
+    male_population_standard_deviation = male_population['Age'].std()
+    male_population_average = male_population['Age'].mean()
+    male_population_median = male_population['Age'].median()
+
+    female_population_standard_deviation = female_population['Age'].std()
+    female_population_average = female_population['Age'].mean()
+    female_population_median = female_population['Age'].median()
+
+    print(f"Average age for all learners in {course_name} is {average}")
+    print(f"""Standard deviation for all learners in {course_name} is {
+        standard_deviation}""")
+    print(f"Median age for all learners in {course_name} is {median}")
+    print(f"""Average age for female learners in {
+          course_name} is {female_population_average}""")
+    print(f"""Standard deviation for female learners in {
+          course_name} is {female_population_standard_deviation}""")
+    print(f"""Median for female learners in {
+          course_name} is {female_population_median}""")
+    print(f"""Average age for male learners in {
+          course_name} is {male_population_average}""")
+    print(f"""Standard deviation for male learners in {
+          course_name} is {male_population_standard_deviation}""")
+    print(f"""Median for male learners in {
+          course_name} is {male_population_median}""")
+
+    # Uncomment if you want to include unknown and other
+    # unknown_population = course_df[course_df['Gender'].isnull()]
+    # other_population = course_df[course_df['Gender'] == 'o']
 
     independent_variable = "Age"
 
@@ -48,10 +81,12 @@ def plot_age_distribution(course_df: pd.DataFrame, course_name: str):
                  binwidth=1, alpha=1.0, label='Male', palette=palette)
     sns.histplot(female_population, x=independent_variable,
                  binwidth=1, alpha=0.8, label='Female', palette=palette)
-    sns.histplot(unknown_population, x=independent_variable, binwidth=1,
-                 alpha=0.5, label='Prefer not to say / Unknown', palette=palette)
-    sns.histplot(other_population, x=independent_variable,
-                 binwidth=1, alpha=1.0, label='Other', palette=palette)
+
+    # Uncomment if you want to include unknown and other
+    # sns.histplot(unknown_population, x=independent_variable, binwidth=1,
+    #              alpha=0.5, label='Prefer not to say / Unknown', palette=palette)
+    # sns.histplot(other_population, x=independent_variable,
+    #              binwidth=1, alpha=1.0, label='Other', palette=palette)
 
     plt.title(f"Age distribution per gender for {course_name}")
     plt.xlabel("Age")
