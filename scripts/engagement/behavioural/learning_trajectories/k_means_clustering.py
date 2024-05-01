@@ -500,6 +500,52 @@ def get_week_of_course_element(db: Database, element_id: str) -> int:
     print(element_id)
     return db["course_elements"].find_one({"element_id": element_id})["week"]
 
+def calculate_quiz_engagement(learner_sessions, quizzes_due_per_assessment_period, assessment_periods, course_has_due_dates):
+    """
+    Calculate the engagement based on pre-filtered sessions for a single learner.
+    """
+    engagement = pd.Series(index=pd.Index(assessment_periods), dtype='object').fillna('')
+
+    if learner_sessions.empty:
+        engagement.update(pd.Series({period: "O" if len(quizzes_due_per_assessment_period.get(period, [])) > 0 else ""
+                                      for period in assessment_periods}))
+        return tuple(engagement.values)
+
+    unique_block_ids_learner = set(learner_sessions['block_id'].unique())
+    assessment_periods_engagement = {period: "" for period in assessment_periods}
+
+    for period, elements_due in quizzes_due_per_assessment_period.items():
+        if not elements_due:
+            continue
+
+        quiz_sessions_in_period = learner_sessions[learner_sessions['end_time'] <= period.right]
+        unique_block_ids_period = set(quiz_sessions_in_period['block_id'].unique())
+
+        quizzes_done_on_time = sum(1 for element in elements_due if element in unique_block_ids_period)
+        quizzes_done = sum(1 for element in elements_due if element in unique_block_ids_learner)
+
+        if course_has_due_dates:
+            if quizzes_done_on_time == len(elements_due):
+                assessment_periods_engagement[period] = "T"
+            elif quizzes_done_on_time + quizzes_done == len(elements_due):
+                assessment_periods_engagement[period] = "B"
+            elif quizzes_done_on_time > 0 or quizzes_done > 0:
+                assessment_periods_engagement[period] = "A"
+            else:
+                assessment_periods_engagement[period] = "O"
+        else:
+            if quizzes_done == len(elements_due):
+                assessment_periods_engagement[period] = "T"
+            elif quizzes_done > 0:
+                assessment_periods_engagement[period] = "A"
+            else:
+                assessment_periods_engagement[period] = "O"
+
+    # Sort and compile the final tuple of engagement status
+    for period in assessment_periods:
+        engagement[period] = assessment_periods_engagement[period]
+    return tuple(engagement.values)
+
 def construct_learner_engagement_mapping(quiz_sessions_df: pd.DataFrame, metadata_df: pd.DataFrame, course_learner_df: pd.DataFrame, video_interactions_df: pd.DataFrame, submissions_df: pd.DataFrame, ora_sessions_df: pd.DataFrame, course_id: str, course_has_due_dates: bool) -> Tuple[Counter[tuple, int], Counter[tuple, int]]:    
     course_start_date = pd.Timestamp(metadata_df["object"]["start_date"])
    
@@ -549,8 +595,14 @@ def construct_learner_engagement_mapping(quiz_sessions_df: pd.DataFrame, metadat
     empty_tuple = ("",) * len(assessment_periods)
     if not quiz_sessions_df.empty:
         tqdm.pandas(desc=f"Processing quiz engagement for {mooc_and_run_id}")
+        quiz_sessions_grouped_by_id = quiz_sessions_df.groupby('course_learner_id')
         course_learner_df['quiz_engagement'] = course_learner_df['course_learner_id'].progress_apply(
-            lambda learner_id: engagement_by_quiz_sessions(quiz_sessions_df, quizzes_due_per_assessment_period, assessment_periods, learner_id, course_has_due_dates))
+        lambda learner_id: calculate_quiz_engagement(quiz_sessions_grouped_by_id.get_group(learner_id),
+                                                quizzes_due_per_assessment_period,
+                                                assessment_periods,
+                                                course_has_due_dates)
+        if learner_id in quiz_sessions_grouped_by_id.groups else (("",) * len(assessment_periods))
+    )
     else:
         course_learner_df['quiz_engagement'] = [empty_tuple for _ in range(len(course_learner_df))]
     
@@ -751,6 +803,9 @@ def main() -> None:
             full_course_id = course["course_id"]
             # if "ST1x" not in full_course_id or "EX101x+2T2018" in full_course_id or "EX101x+3T2015" in full_course_id or "EX101x+3T2016" in full_course_id:
             #     continue
+
+            if "EX101x+2T2018" in full_course_id:
+                continue
 
             mooc_id = full_course_id.split("+")[-2]
             course_run = full_course_id.split("+")[-1]
