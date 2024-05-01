@@ -132,9 +132,15 @@ def main():
         if best_learner == "":
             continue
         mandatory_elements = find_mandatory_elements_by_best_learner(course_id, best_learner, db)
-        mandatory_elements_by_deadline = group_mandatory_elements_by_deadline(course_id, mandatory_elements, db)
-
-        data[course_id] = mandatory_elements_by_deadline
+        # if course_id in [
+        #     "course-v1:DelftX+UnixTx+1T2020",
+        #     "course-v1:DelftX+FP101x+3T2015",
+        #     "course-v1:DelftX+EX101x+3T2015"
+        # ]:
+        #     mandatory_elements_by_deadline = group_mandatory_elements_by_deadline(course_id, mandatory_elements, db)
+        #     data[course_id] = mandatory_elements_by_deadline
+        # else:
+        data[course_id] = list(mandatory_elements)
 
     with open('mandatory_elements_per_course.json', 'w') as f:
         # For 

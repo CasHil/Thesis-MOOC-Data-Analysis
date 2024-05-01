@@ -5,6 +5,7 @@
 scripts/demographic_distributions/figures
 *.json
 *.png
+*.csv
 node_modules
 *.pptx
 .vscode/
