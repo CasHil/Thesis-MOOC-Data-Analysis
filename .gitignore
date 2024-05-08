@@ -9,6 +9,7 @@ scripts/demographic_distributions/figures
 node_modules
 *.pptx
 .vscode/
+*.txt
 
 # From https://github.com/github/gitignore/blob/main/Python.gitignore
 # Byte-compiled / optimized / DLL files
