@@ -34,16 +34,6 @@ def get_mandatory_quizzes(db: Database, course_id: str, learner_id: str) -> set[
 
     return set(quiz_sessions_df["block_id"].unique())
 
-def get_mandatory_ora_sessions(db: Database, course_id: str, learner_id: str) -> set[str]:
-    print("Getting mandatory ora sessions for learner", learner_id, "in course", course_id)
-    ora_sessions = db["ora_sessions"].find({"course_learner_id": learner_id})
-    ora_sessions_df = pd.DataFrame(ora_sessions)
-
-    if ora_sessions_df.empty:
-        return set()
-
-    return set(ora_sessions_df["block_id"].unique())
-
 def get_mandatory_problems(db: Database, course_id: str, learner_id: str) -> set[str]:
     print("Getting mandatory problems for learner", learner_id, "in course", course_id)
     problems = db["submissions"].find({"course_learner_id": learner_id})

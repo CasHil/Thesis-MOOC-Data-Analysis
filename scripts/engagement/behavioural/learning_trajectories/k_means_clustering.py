@@ -250,14 +250,14 @@ def calculate_submission_engagement(learner_submissions: pd.DataFrame, due_dates
             elements_due_in_period = set(due_dates_per_assessment_period.get(assessment_period, []))
             period_submissions = learner_submissions[
                 learner_submissions['question_id'].isin(elements_due_in_period) &
-                (pd.to_datetime(learner_submissions['submission_time']) <= assessment_period.right)
+                (pd.to_datetime(learner_submissions['submission_timestamp']) <= assessment_period.right)
             ]
 
             elements_completed_on_time.update(period_submissions['question_id'].unique())
 
             late_submissions = learner_submissions[
                 learner_submissions['question_id'].isin(elements_due_in_period) &
-                (pd.to_datetime(learner_submissions['submission_time']) > assessment_period.right)
+                (pd.to_datetime(learner_submissions['submission_timestamp']) > assessment_period.right)
             ]
 
             elements_completed_late.update(late_submissions['question_id'].unique())
@@ -403,6 +403,7 @@ def calculate_video_engagement(learner_video_interactions: pd.DataFrame, metadat
     return tuple(engagement.values)
 
 
+
 def calculate_quiz_engagement(learner_sessions: pd.DataFrame, quizzes_due_per_assessment_period: pd.Series, assessment_periods: pd.Index | pd.MultiIndex, course_has_due_dates: bool):
     """
     Calculate the engagement based on pre-filtered quiz sessions for a single learner.
@@ -448,6 +449,20 @@ def calculate_quiz_engagement(learner_sessions: pd.DataFrame, quizzes_due_per_as
         engagement[period] = assessment_periods_engagement[period]
     return tuple(engagement.values)
 
+def extract_week_number_from_element(element_id: str, child_parent_map: dict, order_map: dict) -> int:
+    if not element_id or not child_parent_map or not order_map:
+        return -1
+    
+    parent = child_parent_map.get(element_id)
+    while "chapter" not in parent:
+        parent = child_parent_map.get(parent)
+
+    if not parent:
+        return -1
+    
+    return order_map.get(parent)
+    
+
 def construct_learner_engagement_mapping(quiz_sessions_df: pd.DataFrame, metadata_df: pd.DataFrame, course_learner_df: pd.DataFrame, video_interactions_df: pd.DataFrame, submissions_df: pd.DataFrame, ora_sessions_df: pd.DataFrame, course_id: str, course_has_due_dates: bool) -> Tuple[Counter[tuple, int], Counter[tuple, int]]:    
     course_start_date = pd.Timestamp(metadata_df["object"]["start_date"])
    
@@ -458,24 +473,23 @@ def construct_learner_engagement_mapping(quiz_sessions_df: pd.DataFrame, metadat
     all_mandatory_elements = all_courses_mandatory_elements[course_id]
     elements_per_week = {}
     order_map: dict = metadata_df["object"]["order_map"]
-    child_parent_map = metadata_df["object"]["child_parent_map"]
+    child_parent_map: dict = metadata_df["object"]["child_parent_map"]
 
-    for element in all_mandatory_elements:
-        if element is None:
+    video_keys = [key for key in order_map.keys() if "video" in key]
+    openassessment_keys = [key for key in order_map.keys() if "openassessment" in key]
+
+    elements = all_mandatory_elements + video_keys + openassessment_keys
+
+    for element in tqdm(elements, desc=f"Finding the week that elements belong to"):
+        week_number = extract_week_number_from_element(element, child_parent_map, order_map)
+        if week_number == -1:
             continue
-        parent = child_parent_map.get(element)
-        while parent is not None and "chapter" not in parent:
-            parent = child_parent_map.get(parent)
-        
-        if parent is None:
-            continue
-        week_number = order_map.get(parent)
         if week_number not in elements_per_week:
             elements_per_week[week_number] = []
         elements_per_week[week_number].append(element)
 
     interval_dict = {}
-    for week, elements in elements_per_week.items():
+    for week, elements in tqdm(elements_per_week.items(), desc=f"Grouping elements by assessment period"):
         start_date = course_start_date + pd.DateOffset(weeks=week - 1)
         end_date = start_date + pd.DateOffset(weeks=1)
         interval = pd.Interval(left=start_date, right=end_date, closed='left')
@@ -495,11 +509,32 @@ def construct_learner_engagement_mapping(quiz_sessions_df: pd.DataFrame, metadat
 
     mooc_and_run_id = course_id.split(":")[1]
 
+    # empty_tuple = ("",) * len(assessment_periods)
+    # empty_tuple_series_pd = pd.Series([empty_tuple for _ in range(len(course_learner_df))])
+
+    # if not submissions_df.empty:
+    #     submissions_by_id = submissions_df.groupby('course_learner_id')
+    #     submissions_engagement = course_learner_df.apply(
+    #         lambda row: calculate_submission_engagement(
+    #             submissions_by_id.get_group(row['course_learner_id']) if row['course_learner_id'] in submissions_by_id.groups else pd.DataFrame(),
+    #             metadata_df,
+    #             submissions_due_per_assessment_period,
+    #             assessment_periods
+    #         ),
+    #         axis=1,
+    #     )
+
+    # else:
+    #     submissions_engagement = empty_tuple_series_pd
+
+    # course_learner_df['submission_engagement'] = submissions_engagement
+
     course_learner_ddf: DaskDataFrame = dd.from_pandas(course_learner_df, npartitions=6)
     empty_tuple = ("",) * len(assessment_periods)
     empty_tuple_series_pd = pd.Series([empty_tuple for _ in range(int(course_learner_ddf.shape[0].compute()))])
     empty_tuple_series_dd = dd.from_pandas(empty_tuple_series_pd, npartitions=course_learner_ddf.npartitions)
 
+    print("Setting quiz engagement computations for Dask")
     if not quiz_sessions_df.empty:
         quiz_sessions_by_id = quiz_sessions_df.groupby('course_learner_id')
         quiz_engagement = course_learner_ddf.apply(
@@ -518,6 +553,7 @@ def construct_learner_engagement_mapping(quiz_sessions_df: pd.DataFrame, metadat
     quiz_engagement = quiz_engagement.astype(object)
     course_learner_ddf = course_learner_ddf.assign(quiz_engagement=quiz_engagement)
 
+    print("Setting video engagement computations for Dask")
     if not video_interactions_df.empty:
         video_interactions_by_id = video_interactions_df.groupby('course_learner_id')
         video_engagement = course_learner_ddf.apply(
@@ -536,6 +572,7 @@ def construct_learner_engagement_mapping(quiz_sessions_df: pd.DataFrame, metadat
     video_engagement = video_engagement.astype(object)
     course_learner_ddf['video_engagement'] = video_engagement
 
+    print("Setting submission engagement computations for Dask")
     if not submissions_df.empty:
         submissions_by_id = submissions_df.groupby('course_learner_id')
         submission_engagement = course_learner_ddf.apply(
@@ -554,6 +591,7 @@ def construct_learner_engagement_mapping(quiz_sessions_df: pd.DataFrame, metadat
     submission_engagement = submission_engagement.astype(object)
     course_learner_ddf = course_learner_ddf.assign(submission_engagement=submission_engagement)
 
+    print("Setting ORA engagement computations for Dask")
     if not ora_sessions_df.empty:
         ora_sessions_by_id = ora_sessions_df.groupby('course_learner_id')
         ora_engagement = course_learner_ddf.apply(
@@ -572,6 +610,7 @@ def construct_learner_engagement_mapping(quiz_sessions_df: pd.DataFrame, metadat
     ora_engagement = ora_engagement.astype(object)
     course_learner_ddf = course_learner_ddf.assign(ora_engagement=ora_engagement)
 
+    print("Running computations for video, quiz, submission, and ORA engagement")
     with ProgressBar():
         course_learner_df = course_learner_ddf.compute()
     
@@ -585,6 +624,7 @@ def construct_learner_engagement_mapping(quiz_sessions_df: pd.DataFrame, metadat
 
     course_learner_ddf = course_learner_ddf.assign(engagement=engagement)
 
+    print("Running computations for engagement")
     with ProgressBar():
         course_learner_ddf = course_learner_ddf.compute()
 
@@ -629,21 +669,21 @@ def calculate_engagement(quiz_engagement: tuple[str], video_engagement: tuple[st
                                   submission_engagement_for_period, ora_engagement_for_period])
 
         non_video_statuses.discard("")            
-    
         video_engagement_for_period = get_engagement_for_period(video_engagement, idx)
+        all_statuses = non_video_statuses.union({video_engagement_for_period})
 
-        # Rule 1: If non_video_statuses include 'A', return 'A'
-        if 'A' in non_video_statuses:
-            engagement += ("A",)
-        # Rule 2: If non_video_statuses include 'B' and may include 'T', but not 'A' or 'O'
-        elif non_video_statuses == {'B'} or non_video_statuses == {'B', 'T'}:
+        # Rule 1: If non_video_statuses include 'B' and may include 'T', but not 'A' or 'O'
+        if non_video_statuses == {'B'} or non_video_statuses == {'B', 'T'}:
             engagement += ("B",)
-        # Rule 3: If non_video_statuses are all 'T', return 'T'
+        # Rule 2: If non_video_statuses are all 'T', return 'T'
         elif non_video_statuses == {'T'}:
             engagement += ("T",)
+        # Rule 3: If non_video_statuses include a combination of "B", "O", "A", and "T", but not just "O", return 'A'
+        elif set("BOAT").issuperset(all_statuses) and not all_statuses == {'O'}:
+            engagement += ("A",)
         # Rule 4: If video_engagement_for_period is 'A', return 'T' if non_video_statuses is empty, otherwise 'A'
         elif video_engagement_for_period == "A":
-            engagement += ("T",) if not non_video_statuses else ("A",)
+            engagement += ("T",) if non_video_statuses == set() else ("A",)
         # Rule 5: If there are no due dates and no videos due, and non_video_statuses is empty, return 'T'
         elif not non_video_statuses and video_engagement_for_period == "":
             engagement += ("T",)
@@ -808,18 +848,19 @@ def main() -> None:
 
             filtered_ids: set[str] = set(filtered_learners['course_learner_id'].unique())
 
-            submissions = get_submissions(db, escaped_course_id, filtered_ids)
+            course_id = "course-v1:DelftX+" + "+".join(course_id_with_course_run.split("_")[:2])
+            submissions = get_submissions(db, course_id, filtered_ids)
             print("Submissions done")
             video_interactions = get_video_interactions(
-                db, escaped_course_id, filtered_ids)
+                db, course_id, filtered_ids)
             print("Video interactions done")
             quiz_sessions = get_quiz_sessions(
-                db, "course-v1:DelftX+" + "+".join(course_id_with_course_run.split("_")[:2]), filtered_ids)
+                db, course_id, filtered_ids)
             print("Quiz sessions done")
             ora_sessions = get_ora_sessions(
-                db, escaped_course_id, filtered_ids)
+                db, course_id, filtered_ids)
 
-            print("All data loaded")
+            print("ORA sessions done")
             male_learner_engagement_mapping, female_learner_engagement_mapping = construct_learner_engagement_mapping(quiz_sessions, metadata,
                                                                                                                       filtered_learners, video_interactions, submissions, ora_sessions, full_course_id, course_has_due_dates)
             
