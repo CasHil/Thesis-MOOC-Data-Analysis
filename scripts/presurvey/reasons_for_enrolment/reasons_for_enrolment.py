@@ -90,147 +90,148 @@ def find_all_presurveys_for_course_id(course_id: str) -> list[str]:
 
 
 def preprocess_text(text):
-    # Convert text to lowercase
     text = text.lower()
-
-    # Remove punctuation
     text = text.translate(str.maketrans('', '', string.punctuation))
-
-    # Remove numerals
     text = text.translate(str.maketrans('', '', string.digits))
-
-    # Tokenize text
     tokens = nltk.word_tokenize(text)
 
-    # Remove stopwords
     stop_words = set(stopwords.words('english'))
     filtered_tokens = [word for word in tokens if word not in stop_words]
 
-    # Stemming
     stemmer = PorterStemmer()
     stemmed_tokens = [stemmer.stem(word) for word in filtered_tokens]
 
-    # Join tokens back to string
     processed_text = ' '.join(stemmed_tokens)
     return processed_text
 
 
 def cluster_responses():
     load_dotenv()
-    COURSES = json.loads(os.getenv("COURSES"))
     survey_questions = SurveyQuestions()
+    course_contingency_tables = {}
+
     for course in COURSES:
         presurveys = find_all_presurveys_for_course_id(course)
         if not presurveys:
             print(f"No presurveys found for course {course}")
             continue
+
+        tables = []
+
         for presurvey_file in presurveys:
             parts = presurvey_file.rstrip('.txt').split('_')
             course_run = '_'.join([parts[-2], parts[-1]])
-
-            print(course_run)
-
-            pre_survey = pd.read_csv(presurvey_file, sep='\t')
-            pre_survey = pre_survey.drop(0)
-
-            user_ids = pre_survey["hash_id"].tolist()
-            genders = find_genders_by_user_ids(user_ids)
-
-            pre_survey["gender"] = pre_survey["hash_id"].map(genders)
-
-            male_df = pre_survey[pre_survey['gender'] == 'm']
-            female_df = pre_survey[pre_survey['gender'] == 'f']
-
             survey_version = survey_questions.get_survey_version(course_run)
             closed_question = survey_questions.get_closed_question(
                 survey_version)
+            open_question = survey_questions.get_open_question(survey_version)
+            presurvey = pd.read_csv(presurvey_file, sep='\t')
+            presurvey = presurvey.drop(0)
+            user_ids = presurvey["hash_id"].tolist()
+            genders = find_genders_by_user_ids(user_ids)
+            presurvey["gender"] = presurvey["hash_id"].map(genders)
 
-            closed_question_percentages_male = male_df[closed_question].value_counts(
-                normalize=True) * 100
-            # print(f"""Closed question responses for male: {
-            #       len(male_df[closed_question])}""")
-            # print(f"""Closed question response percentages male {
-            #       closed_question_percentages_male}""")
-            # close_question_percentages_female = female_df[closed_question].value_counts(
-            #     normalize=True) * 100
-            # print(f"""Closed question responses for female: {
-            #       len(female_df[closed_question])}""")
-            # print(f"""Closed question response percentages female {
-            #       close_question_percentages_female}""")
+            contingency_table = create_contingency_table_for_run(
+                presurvey, closed_question)
 
-            male_counts = male_df[closed_question].value_counts().reindex(
-                pre_survey[closed_question].unique(), fill_value=0)
-            female_counts = female_df[closed_question].value_counts().reindex(
-                pre_survey[closed_question].unique(), fill_value=0)
-            # Create a contingency table
-            contingency_table = pd.DataFrame({
-                'Male': male_counts,
-                'Female': female_counts
-            })
+            tables.append(contingency_table)
 
-            contingency_table = contingency_table.loc[(
-                contingency_table['Male'] != 0) | (contingency_table['Female'] != 0)]
+            print(f"Processing {course} survey version {survey_version}")
+            open_question_gender_and_hash_id = presurvey[[
+                open_question, 'gender', 'hash_id']].dropna()
+            save_open_question_responses_to_file(
+                open_question_gender_and_hash_id, course)
+        if tables:
+            combined_table = pd.concat(tables).groupby(level=0).sum()
+            course_contingency_tables[course] = combined_table
 
-            print("Contingency Table:")
-            # print(contingency_table)
+    # Perform Chi-squared tests for each course
+    for course, table in course_contingency_tables.items():
+        table = table.loc[(
+            table['Male'] != 0) | (table['Female'] != 0)]
+        merged_table = merge_contingency_table_answers(table)
+        merged_table.to_csv(
+            f"reasons_for_enrolment/closed_responses/{course}_contingency_table.csv")
+        chi2, p, dof, expected = chi2_contingency(merged_table)
+        contingency_table_percentages = merged_table.div(
+            merged_table.sum(axis=0), axis=1) * 100
+        contingency_table_percentages = contingency_table_percentages.round(2)
+        print(contingency_table_percentages)
+        print(f"Results of Chi-squared test for {course}:")
+        print(f"Chi-squared Statistic: {chi2}, P-value: {p}")
 
-            # Perform the chi-square test
-            chi2, p_value, dof, expected = chi2_contingency(contingency_table)
 
-            print(f"Chi-squared Test statistic: {chi2}")
-            print(f"P-value: {p_value}")
-            print(f"Degrees of freedom: {dof}")
-            print("Expected frequencies:")
-            # print(pd.DataFrame(expected, columns=contingency_table.columns,
-            #   index=contingency_table.index))
+def create_contingency_table_for_run(presurvey: pd.DataFrame, closed_question: str) -> pd.DataFrame:
+    male_df = presurvey[presurvey['gender'] == 'm']
+    female_df = presurvey[presurvey['gender'] == 'f']
 
-            # Evaluate the p-value
-            if p_value < 0.05:
-                print(
-                    "There is a statistically significant difference between male and female responses.")
-            else:
-                print(
-                    "There is no statistically significant difference between male and female responses.")
+    male_counts = male_df[closed_question].value_counts().reindex(
+        presurvey[closed_question].unique(), fill_value=0)
+    female_counts = female_df[closed_question].value_counts().reindex(
+        presurvey[closed_question].unique(), fill_value=0)
 
-            # open_question = survey_questions.get_open_question(survey_version)
-            # # Drop NaN from open_question
-            # pre_survey = pre_survey.dropna(subset=[open_question])
-            # pre_survey[open_question] = pre_survey[open_question].apply(
-            #     preprocess_text)
+    contingency_table = pd.DataFrame({
+        'Male': male_counts,
+        'Female': female_counts
+    }).dropna()
 
-            # # Print pre_survey[open_question] length
-            # print(f"Length of open question responses: {
-            #       len(pre_survey[open_question])}")
+    return contingency_table
 
-            # if len(pre_survey[open_question]) < 10:
-            #     print(f"Skipping course {
-            #           course_run} due to insufficient responses.")
-            #     continue
 
-            # vectorizer = TfidfVectorizer(
-            #     max_df=0.5, min_df=0.01, ngram_range=(1, 2))
-            # tfidf_matrix = vectorizer.fit_transform(pre_survey[open_question])
+def save_open_question_responses_to_file(open_question_responses: pd.DataFrame, course_run: str) -> None:
+    open_question_responses.to_csv(
+        f"reasons_for_enrolment/open_responses/{course_run}_open_question_responses.csv", index=False)
 
-            # feature_names = vectorizer.get_feature_names_out()
-            # unique_terms_count = len(feature_names)
-            # print(f"Unique terms count: {unique_terms_count}")
 
-            # num_clusters = 5
-            # km = KMeans(n_clusters=num_clusters, init='k-means++',
-            #             max_iter=300, n_init=10)
-            # km.fit(tfidf_matrix)
-            # clusters = km.labels_.tolist()
+def merge_contingency_table_answers(contingency_table: pd.DataFrame) -> pd.DataFrame:
+    """Merge contingency table answers."""
 
-            # Evaluation
-            # print("\nTop terms per cluster:")
-            # order_centroids = km.cluster_centers_.argsort()[:, ::-1]
-            # features = vectorizer.get_feature_names_out()
-            # for i in range(num_clusters):
-            #     print(f"Cluster {i}: ", end='')
-            #     for ind in order_centroids[i, :10]:  # Top 10 terms
-            #         print(f'{features[ind]} ', end='')
-            #     print()
+    print(contingency_table)
+    instructor_indices = [
+        idx for idx in contingency_table.index if 'instructor' in idx.lower()]
+    if instructor_indices:
+        instructor_data = contingency_table.loc[instructor_indices].sum()
+        contingency_table = contingency_table.drop(instructor_indices)
+        contingency_table.loc['know the instructor'] = instructor_data
 
-            # # Silhouette Score
-            # score = silhouette_score(tfidf_matrix, clusters)
-            # print("Silhouette Score: ", score)
+    career_indices = [
+        idx for idx in contingency_table.index if 'career' in idx.lower() or 'job' in idx.lower() or 'work' in idx.lower()
+    ]
+    if career_indices:
+        career_data = contingency_table.loc[career_indices].sum()
+        contingency_table = contingency_table.drop(career_indices)
+        contingency_table.loc['career'] = career_data
+
+    studies_indices = [
+        idx for idx in contingency_table.index if 'degree' in idx.lower() or 'studies' in idx.lower()
+    ]
+    if studies_indices:
+        degree_data = contingency_table.loc[studies_indices].sum()
+        contingency_table = contingency_table.drop(studies_indices)
+        contingency_table.loc['degree'] = degree_data
+
+    other_indices = [
+        idx for idx in contingency_table.index if 'other' in idx.lower()
+    ]
+    if other_indices:
+        other_data = contingency_table.loc[other_indices].sum()
+        contingency_table = contingency_table.drop(other_indices)
+        contingency_table.loc['other'] = other_data
+
+    teaching_indices = [
+        idx for idx in contingency_table.index if 'teach' in idx.lower()
+    ]
+    if teaching_indices:
+        teaching_data = contingency_table.loc[teaching_indices].sum()
+        contingency_table = contingency_table.drop(teaching_indices)
+        contingency_table.loc['teaching'] = teaching_data
+
+    interested_indices = [
+        idx for idx in contingency_table.index if 'interest' in idx.lower()
+    ]
+    if interested_indices:
+        interested_data = contingency_table.loc[interested_indices].sum()
+        contingency_table = contingency_table.drop(interested_indices)
+        contingency_table.loc['interest'] = interested_data
+
+    return contingency_table
