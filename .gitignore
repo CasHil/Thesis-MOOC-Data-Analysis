@@ -5,10 +5,12 @@
 scripts/demographic_distributions/figures
 *.json
 *.png
+*.csv
 node_modules
 *.pptx
 .vscode/
 *.csv
+*.txt
 
 # From https://github.com/github/gitignore/blob/main/Python.gitignore
 # Byte-compiled / optimized / DLL files

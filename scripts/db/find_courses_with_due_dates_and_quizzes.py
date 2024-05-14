@@ -9,30 +9,8 @@ import os
 import json
 
 client = MongoClient('mongodb://localhost:27017/')
-db = client["edx_testing"]
+db = client["edx_test"]
 collection = db.quiz_sessions
-
-
-def get_course_id(session_id):
-    try:
-        return session_id.split("_")[2]
-    except IndexError:
-        return ""
-
-
-def get_block_id(course_learner_id):
-    try:
-        return course_learner_id.split("_")[0]
-    except IndexError:
-        return ""
-
-
-def update_document(document, block_id, course_id):
-    collection.update_one(
-        {"_id": document["_id"]},
-        {"$set": {"block_id": block_id, "course_id": course_id}}
-    )
-
 
 def get_course_folders():
     course_folders = []
@@ -50,26 +28,33 @@ def get_course_structure(course_folder):
 
 
 def has_due_date(course_structure):
+    count = 0
     for line in course_structure:
         # print(line)
         if "due" in line and "null" not in line:
-            return True
-    return False
+            count += 1
+    return count > 5
 
 courses_with_due_dates = []
 course_folders = get_course_folders()
 for course_folder in course_folders:
     course_structure = get_course_structure(course_folder)
     if has_due_date(course_structure):
-        courses_with_due_dates.append(course_folder)    
+        course_folder_without_run = "course-v1:DelftX+" + "+".join(course_folder.split("_")[:2]).replace("[", "").replace("]", "")
+        courses_with_due_dates.append(course_folder_without_run)    
     else:
         print(f"{course_folder} has no due date.")
 
 client = MongoClient("mongodb://localhost:27017/")
 print("Connected to MongoDB")
-db = client["edx-test"]
+db = client["edx_test"]
+print("Connected to database")
+
+print(courses_with_due_dates)
 
 for course_folder in courses_with_due_dates:
     quiz_query = {"course_id": course_folder}
+    result = collection.count_documents(quiz_query)
+    print(result)
     if collection.count_documents(quiz_query) > 0:
         print(f"Course {course_folder} has quiz sessions and due dates.")
