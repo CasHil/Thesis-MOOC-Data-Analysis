@@ -791,7 +791,7 @@ def calculate_k_means_clusters(trajectory_frequency: pd.Series, course_run: str,
 
     # Define cluster names and colors
     cluster_names = {sorted_clusters[0]: 'Completing', sorted_clusters[1]: 'Auditing', sorted_clusters[2]: 'Disengaging', sorted_clusters[3]: 'Sampling'}
-    cluster_colors = {sorted_clusters[0]: '#DC267F', sorted_clusters[1]: '#FE6100', sorted_clusters[2]: '#648FFF', sorted_clusters[3]: '#DC267F'}
+    cluster_colors = {sorted_clusters[0]: '#D81B60', sorted_clusters[1]: '#1E88E5', sorted_clusters[2]: '#FFC107', sorted_clusters[3]: '#004D40'}
 
     print(f"\n{course_run}")
     print(f"Best silhouette score: {best_score:.4f}")
