@@ -95,6 +95,18 @@ def plot_location_distribution_per_gender(location_df: pd.DataFrame, graph_name:
     men_df = location_df[location_df['Gender'] == 'm']
     women_df = location_df[location_df['Gender'] == 'f']
 
+    if graph_name:
+        print(graph_name)
+        # Get top 5 countries by men + women count
+        top_countries = location_df['Country'].value_counts().head(5).index
+        for country in top_countries:
+            country_df = location_df[location_df['Country'] == country]
+            men_count = len(country_df[country_df['Gender'] == 'm'])
+            women_count = len(country_df[country_df['Gender'] == 'f'])
+            print(f"{country} total count {men_count + women_count}")
+            print(f"{country} male count {men_count}")
+            print(f"{country} female count {women_count}")
+
     men_counts = men_df['Country'].value_counts().reset_index()
     men_counts.columns = ['Country', 'Count']
     women_counts = women_df['Country'].value_counts().reset_index()
@@ -158,9 +170,11 @@ def plot_location_distribution_per_gender(location_df: pd.DataFrame, graph_name:
 
 
 def plot_location_distribution_per_gender_per_course(location_gender_per_course_df: pd.DataFrame) -> None:
-    for course in location_gender_per_course_df['Course ID'].unique():
-        course_df = location_gender_per_course_df[location_gender_per_course_df['Course ID'] == course]
-        course_name = identify_course(course)
+    location_gender_per_course_df['course_name'] = location_gender_per_course_df['Course ID'].apply(
+        identify_course)
+
+    for course_name in location_gender_per_course_df['course_name'].unique():
+        course_df = location_gender_per_course_df[location_gender_per_course_df['course_name'] == course_name]
         graph_name = f"Learner location distribution for {course_name}"
         plot_location_distribution_per_gender(course_df, graph_name)
 

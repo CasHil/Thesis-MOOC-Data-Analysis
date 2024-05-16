@@ -9,6 +9,7 @@ scripts/demographic_distributions/figures
 node_modules
 *.pptx
 .vscode/
+*.csv
 *.txt
 
 # From https://github.com/github/gitignore/blob/main/Python.gitignore

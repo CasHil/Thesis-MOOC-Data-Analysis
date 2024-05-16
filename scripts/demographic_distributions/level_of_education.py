@@ -33,31 +33,46 @@ def fetch_education_level_and_demographic_info() -> pd.DataFrame:
 def plot_education_distribution(course_df: pd.DataFrame, course_name: str) -> None:
     df_copy = course_df.copy()
     df_copy['GenderLabel'] = df_copy['Gender'].map(
-        {'m': 'Male', 'f': 'Female', 'o': 'Other'}).fillna('Prefer not to say / Unknown')
-    categories_order = ['Male', 'Female',
-                        'Other', 'Prefer not to say / Unknown']
+        {'m': 'Male', 'f': 'Female'}).dropna()
+
+    categories_order = ['Male', 'Female']
 
     education_gender_counts = df_copy.groupby(
         ['Level of Education', 'GenderLabel']).size().unstack(fill_value=0)
     education_gender_counts = education_gender_counts.reindex(
         columns=categories_order, fill_value=0)
 
+    # Adding a total column for easier analysis and dropping it for visualization
     education_gender_counts['Total'] = education_gender_counts.sum(axis=1)
-    education_gender_counts = education_gender_counts.sort_values(
-        by='Total', ascending=False).drop(columns=['Total'])
+    sorted_education_counts = education_gender_counts.sort_values(
+        by='Total', ascending=False)
+
+    # Print detailed statistics
+    print(f"Course Name: {course_name}")
+    print("Education Level Distribution:")
+    print(sorted_education_counts[['Total', 'Male', 'Female']])
+
+    # Drop the 'Total' column for plotting
+    education_gender_counts = sorted_education_counts.drop(columns=['Total'])
 
     if not education_gender_counts.empty:
         ax = education_gender_counts.plot(
-            kind='bar', stacked=True, figsize=(12, 8))
+            kind='bar', stacked=True, color=['C1', 'C0'], figsize=(12, 8))
+
         plt.title('Education Distribution per Gender in ' + course_name)
         plt.xlabel('Education Level')
         plt.ylabel('Count')
         plt.xticks(rotation=90)
         plt.tight_layout()
-        plt.legend(title='Gender')
 
         for container in ax.containers:
-            plt.setp(container, width=0.85)
+            plt.setp(container, width=0.85)  # Adjust the width of the bars
+
+        # Create a custom legend
+        from matplotlib.patches import Patch
+        legend_elements = [Patch(facecolor='C1', label='Male'),
+                           Patch(facecolor='C0', label='Female')]
+        ax.legend(handles=legend_elements, title='Gender')
 
         plt.savefig(
             f"./figures/education/education_distribution_{course_name}.png")
@@ -68,13 +83,13 @@ def plot_education_distribution(course_df: pd.DataFrame, course_name: str) -> No
 def expand_education_level(education_df: pd.DataFrame) -> None:
     education_map = {
         "none": "No formal education",
-        "a": "College",
+        "a": "Associate degree",
         "hs": "Secondary school",
-        "m": "Master's",
-        "jhs": "Secondary school (incomplete)",
-        "p_oth": "Professional",
-        "p_se": "(Post-)graduate",
-        "b": "Bachelor's",
+        "m": "Master's/Professional degree",
+        "jhs": "Junior secondary school",
+        "p_oth": "Doctorate in other field",
+        "p_se": "Doctorate in science or engineering",
+        "b": "Bachelor's degree",
         "other": "Other educational background"
     }
     education_df['Level of Education'] = education_df['Level of Education'].map(
