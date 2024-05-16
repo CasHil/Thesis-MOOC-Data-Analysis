@@ -161,26 +161,20 @@ def get_video_interactions(db: Database, course_id: str, filtered_ids: set[str],
     video_interactions_df = pd.DataFrame(video_interactions)
     
     video_interactions_df['week'] = video_interactions_df['video_id'].apply(
-        lambda video_id: get_week_of_video_element(db, video_id)
+        lambda video_id: get_week_of_video_element(db, video_id, course_id)
     )
 
     start_time = pd.Timestamp(metadata_df["object"]["start_date"])
-
     video_interactions_df['period'] = video_interactions_df['week'].apply(convert_week_to_interval, args=(start_time,))
 
     if video_interactions_df.empty:
         print(
             f"No video interactions found for course {course_id}")
         return pd.DataFrame()
-
-    video_interactions_df['start_time'] = pd.to_datetime(
-        video_interactions_df['start_time'])
-    video_interactions_df['end_time'] = pd.to_datetime(
-        video_interactions_df['end_time'])
     
     video_interactions_df = video_interactions_df.dropna(subset=['course_learner_id'])
     video_interactions_df = video_interactions_df.drop(columns=['_id', 'type', 'watch_duration', 'times_forward_seek', 'duration_forward_seek',
-                                                       'times_backward_seek', 'duration_backward_seek', 'times_speed_up', 'times_speed_down', 'times_pause', 'duration_pause'])
+                                                       'times_backward_seek', 'duration_backward_seek', 'times_speed_up', 'times_speed_down', 'times_pause', 'duration_pause', 'start_time', 'end_time', 'session_id'])
     return downcast_numeric_columns(video_interactions_df)
 
 
@@ -253,8 +247,9 @@ def calculate_submission_engagement(learner_submissions: pd.DataFrame, due_dates
 
     engagement = ""
     if learner_submissions.empty:
-        for period in assessment_periods:
-            if len(due_dates_per_assessment_period.get(period, [])) > 0:
+        for assessment_period in assessment_periods:
+            number_of_due_elements = len(due_dates_per_assessment_period.get(assessment_period, []))
+            if number_of_due_elements > 0:
                 engagement += "O"
             else:
                 engagement += "X"
@@ -280,11 +275,16 @@ def calculate_submission_engagement(learner_submissions: pd.DataFrame, due_dates
 
             elements_completed_late.update(late_submissions['question_id'].unique())
 
-        for period in assessment_periods:
-            due_elements = set(due_dates_per_assessment_period.get(period, []))
+        for assessment_period in assessment_periods:
+            due_elements = set(due_dates_per_assessment_period.get(assessment_period, []))
+            number_of_due_elements = len(due_elements)
             completed_on_time = due_elements.intersection(elements_completed_on_time)
             completed_late = due_elements.intersection(elements_completed_late)
             all_completed = completed_on_time.union(completed_late)
+
+            if number_of_due_elements == 0:
+                engagement += "X"
+                continue
 
             if due_elements.issubset(completed_on_time):
                 engagement += "T"
@@ -330,7 +330,8 @@ def calculate_ora_engagement(learner_ora_sessions: pd.DataFrame, ora_due_dates_p
 
     if learner_ora_sessions.empty:
         for period in assessment_periods:
-            if len(ora_due_dates_per_assessment_period.get(period, [])) > 0:
+            number_of_elements_due = len(ora_due_dates_per_assessment_period.get(period, []))
+            if number_of_elements_due > 0:
                 engagement += "O"
             else:
                 engagement += "X"
@@ -389,8 +390,8 @@ def calculate_ora_engagement(learner_ora_sessions: pd.DataFrame, ora_due_dates_p
 def get_week_of_course_element(db: Database, element_id: str) -> int:
     return db["course_elements"].find_one({"element_id": element_id})["week"]
 
-def get_week_of_video_element(db: Database, video_id: str) -> int:
-    return db["course_elements"].find_one({"element_id": {"$regex": video_id}})["week"]
+def get_week_of_video_element(db: Database, video_id: str, course_id: str) -> int:
+    return db["course_elements"].find_one({"element_id": {"$regex": video_id}, "course_id": course_id})["week"]
 
 def calculate_video_engagement(learner_video_interactions: pd.DataFrame, videos_per_assessment_period: pd.Series, assessment_periods: list[pd.Interval]) -> str:
     """
@@ -405,7 +406,6 @@ def calculate_video_engagement(learner_video_interactions: pd.DataFrame, videos_
             else:
                 engagement += "X"
         return engagement
-
     
     video_interactions_grouped_by_week: DataFrameGroupBy = learner_video_interactions.groupby('week')
 
@@ -431,7 +431,8 @@ def calculate_quiz_engagement(learner_sessions: pd.DataFrame, quizzes_due_per_as
 
     if learner_sessions.empty:
         for period in assessment_periods:
-            if quizzes_due_per_assessment_period.get(period, []):
+            elements_due = quizzes_due_per_assessment_period.get(period, [])
+            if len(elements_due) > 0:
                 engagement += "O"
             else:
                 engagement += "X"
@@ -445,6 +446,7 @@ def calculate_quiz_engagement(learner_sessions: pd.DataFrame, quizzes_due_per_as
 
     for period in assessment_periods:
         elements_due = quizzes_due_per_assessment_period.get(period, [])
+        number_of_elements_due = len(elements_due)
         quiz_sessions_in_period = learner_sessions[learner_sessions['end_time'] <= period.right]
         unique_block_ids_period = set(quiz_sessions_in_period['block_id'].unique())
 
@@ -452,25 +454,30 @@ def calculate_quiz_engagement(learner_sessions: pd.DataFrame, quizzes_due_per_as
         quizzes_done = sum(1 for element in elements_due if element in unique_block_ids_learner)
 
         if course_has_due_dates:
+            if number_of_elements_due == 0:
+                engagement += "X"
+                continue
+
             if quizzes_done_on_time >= len(elements_due):
                 engagement += "T"
             elif quizzes_done_on_time + quizzes_done >= len(elements_due):
                 engagement += "B"
             elif quizzes_done_on_time > 0 or quizzes_done > 0:
                 engagement += "A"
-            elif len(elements_due) > 0:
-                engagement += "O"
             else:
-                engagement += "X"
+                engagement += "O"
+
         else:
+            if number_of_elements_due == 0:
+                engagement += "X"
+                continue
+
             if quizzes_done + quizzes_done_on_time >= len(elements_due):
                 engagement += "T"
             elif quizzes_done_on_time + quizzes_done > 0:
                 engagement += "A"
-            elif len(elements_due) > 0:
-                engagement += "O"
             else:
-                engagement += "X"
+                engagement += "O"
 
     return engagement
 
@@ -763,6 +770,19 @@ def engagement_to_numeric(engagement_labels: str) -> list:
 
 
 def calculate_k_means_clusters(trajectory_frequency: pd.Series, course_run: str, gender: str) -> None:
+    # From the keys of trajectory_frequency, print an example for the different lengths of the keys
+    length_set = set()
+    for key in trajectory_frequency.keys():
+        # if no key of this length exists, add it to the set
+        new_length = True
+        for item in length_set:
+            if len(key) == len(item):
+                new_length = False
+        if new_length:
+            length_set.add(key)
+            print(key)
+            break
+
     learner_engagement_lists = []
 
     first_trajectory = trajectory_frequency.index[0]
@@ -770,9 +790,10 @@ def calculate_k_means_clusters(trajectory_frequency: pd.Series, course_run: str,
 
     for pattern, freq in trajectory_frequency.items():
         numeric_values = engagement_to_numeric(pattern)
-        for _ in range(freq):
-            learner_engagement_lists.append(numeric_values)
-    X = np.array(learner_engagement_lists)
+        repeated_values = np.repeat([numeric_values], freq, axis=0)
+        learner_engagement_lists.append(repeated_values)
+
+    X = np.concatenate(learner_engagement_lists, axis=0)
 
     best_score = -1
     best_kmeans = None
@@ -839,6 +860,9 @@ def calculate_k_means_clusters(trajectory_frequency: pd.Series, course_run: str,
     plt.savefig(f'figures/{gender}_{course_run}.png')
     plt.close()
 
+    # Return a dictionary of the cluster labels and their sizes
+    return df['cluster'].value_counts().sort_index().to_dict()
+
 
 def get_quiz_sessions(db: Database, course_id: str, filtered_ids: set[str]) -> pd.DataFrame:
     quiz_sessions_query = construct_query("course_id", course_id, filtered_ids, exact=True)
@@ -863,7 +887,7 @@ def get_quiz_sessions(db: Database, course_id: str, filtered_ids: set[str]) -> p
 def main() -> None:
     client = MongoClient("mongodb://localhost:27017/")
     print("Connected to MongoDB")
-    db = client["edx_test"]
+    db = client["edx_prod"]
 
     courses = get_courses(db)
 
