@@ -134,6 +134,9 @@ def cluster_responses():
             contingency_table = create_contingency_table_for_run(
                 presurvey, closed_question)
 
+            write_clusters_to_csv(
+                presurvey, closed_question, course_run)
+
             tables.append(contingency_table)
 
             print(f"Processing {course} survey version {survey_version}")
@@ -147,6 +150,21 @@ def cluster_responses():
 
     # Perform Chi-squared tests for each course
     for course, table in course_contingency_tables.items():
+        # Find all csv files in reasons_for_enrolment/clusters with the same course name in them and combine them into one.
+        cluster_files = glob.glob(
+            f"reasons_for_enrolment/clusters/{course}*.csv")
+        cluster_dfs = [pd.read_csv(file) for file in cluster_files]
+        combined_clusters = pd.concat(cluster_dfs)
+        combined_clusters = combined_clusters.dropna(axis=1, how='all')
+
+        # Exclude the head and remove any trailing commas
+        combined_clusters.to_csv(
+            f"reasons_for_enrolment/clusters/{course}.csv", index=False, header=False)
+
+        # Remove all the files that were combined
+        for file in cluster_files:
+            os.remove(file)
+
         table = table.loc[(
             table['Male'] != 0) | (table['Female'] != 0)]
         merged_table = merge_contingency_table_answers(table)
@@ -181,6 +199,26 @@ def create_contingency_table_for_run(presurvey: pd.DataFrame, closed_question: s
 def save_open_question_responses_to_file(open_question_responses: pd.DataFrame, course_run: str) -> None:
     open_question_responses.to_csv(
         f"reasons_for_enrolment/open_responses/{course_run}_open_question_responses.csv", index=False)
+
+
+def write_clusters_to_csv(presurvey_df: pd.DataFrame, closed_question: str, course_run: str) -> None:
+    presurvey_df = presurvey_df[['hash_id', 'gender', closed_question]]
+    presurvey_df = presurvey_df.dropna(subset=[closed_question])
+    presurvey_df[closed_question] = presurvey_df[closed_question].apply(
+        lambda x: 'know the instructor' if 'instructor' in x.lower() else x)
+    presurvey_df[closed_question] = presurvey_df[closed_question].apply(
+        lambda x: 'career' if 'career' in x.lower() or 'job' in x.lower() or 'work' in x.lower() else x)
+    presurvey_df[closed_question] = presurvey_df[closed_question].apply(
+        lambda x: 'degree' if 'degree' in x.lower() or 'studies' in x.lower() else x)
+    presurvey_df[closed_question] = presurvey_df[closed_question].apply(
+        lambda x: 'other' if 'other' in x.lower() else x)
+    presurvey_df[closed_question] = presurvey_df[closed_question].apply(
+        lambda x: 'teaching' if 'teach' in x.lower() else x)
+    presurvey_df[closed_question] = presurvey_df[closed_question].apply(
+        lambda x: 'interest' if 'interest' in x.lower() else x)
+
+    presurvey_df.to_csv(
+        f"reasons_for_enrolment/clusters/{course_run}.csv", index=False)
 
 
 def merge_contingency_table_answers(contingency_table: pd.DataFrame) -> pd.DataFrame:
