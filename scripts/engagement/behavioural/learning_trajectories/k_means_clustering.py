@@ -243,12 +243,12 @@ def get_learner_submissions_in_assessment_period(learner_submissions: pd.DataFra
 
 
 
-def calculate_submission_engagement(learner_submissions: pd.DataFrame, due_dates_per_assessment_period: pd.Series, assessment_periods: list[pd.Interval], course_has_due_dates: bool) -> str:
+def calculate_submission_engagement(learner_submissions: pd.DataFrame, submissions_due_per_assessment_period: pd.Series, assessment_periods: list[pd.Interval], course_has_due_dates: bool) -> str:
 
     engagement = ""
     if learner_submissions.empty:
         for assessment_period in assessment_periods:
-            number_of_due_elements = len(due_dates_per_assessment_period.get(assessment_period, []))
+            number_of_due_elements = len(submissions_due_per_assessment_period.get(assessment_period, []))
             if number_of_due_elements > 0:
                 engagement += "O"
             else:
@@ -260,7 +260,7 @@ def calculate_submission_engagement(learner_submissions: pd.DataFrame, due_dates
         elements_completed_late = set()
 
         for assessment_period in assessment_periods:
-            elements_due_in_period = set(due_dates_per_assessment_period.get(assessment_period, []))
+            elements_due_in_period = set(submissions_due_per_assessment_period.get(assessment_period, []))
             period_submissions = learner_submissions[
                 learner_submissions['question_id'].isin(elements_due_in_period) &
                 (pd.to_datetime(learner_submissions['submission_timestamp']) <= assessment_period.right)
@@ -276,7 +276,7 @@ def calculate_submission_engagement(learner_submissions: pd.DataFrame, due_dates
             elements_completed_late.update(late_submissions['question_id'].unique())
 
         for assessment_period in assessment_periods:
-            due_elements = set(due_dates_per_assessment_period.get(assessment_period, []))
+            due_elements = set(submissions_due_per_assessment_period.get(assessment_period, []))
             number_of_due_elements = len(due_elements)
             completed_on_time = due_elements.intersection(elements_completed_on_time)
             completed_late = due_elements.intersection(elements_completed_late)
@@ -297,7 +297,13 @@ def calculate_submission_engagement(learner_submissions: pd.DataFrame, due_dates
 
     else:
         for assessment_period in assessment_periods:
-            elements_due_in_period = set(due_dates_per_assessment_period.get(assessment_period, []))
+            elements_due_in_period = set(submissions_due_per_assessment_period.get(assessment_period, []))
+            number_of_elements_due = len(elements_due_in_period)
+
+            if number_of_elements_due == 0:
+                engagement += "X"
+                continue
+
             period_submissions = learner_submissions[
                 learner_submissions['question_id'].isin(elements_due_in_period)
             ]
@@ -308,10 +314,8 @@ def calculate_submission_engagement(learner_submissions: pd.DataFrame, due_dates
                 engagement += "T"
             elif submissions_done > 0:
                 engagement += "A"
-            elif elements_due_in_period:
-                engagement += "O"
             else:
-                engagement += "X"
+                engagement += "O"
 
     return engagement
 
@@ -493,14 +497,34 @@ def extract_week_number_from_element(element_id: str, child_parent_map: dict, or
         return -1
     
     return order_map.get(parent)
-    
 
-def construct_learner_engagement_mapping(quiz_sessions_df: pd.DataFrame, metadata_df: pd.DataFrame, course_learner_df: pd.DataFrame, video_interactions_df: pd.DataFrame, submissions_df: pd.DataFrame, ora_sessions_df: pd.DataFrame, course_id: str, course_has_due_dates: bool, db: Database) -> Tuple[Counter[tuple, int], Counter[tuple, int]]:    
+def get_max_score_per_week(elements_per_assessment_period: pd.DataFrame) -> pd.Series:
+    assessment_periods = elements_per_assessment_period.index
+    max_score_per_week = pd.Series(dtype=int)
+    for idx, assessment_period in enumerate(assessment_periods, start=1):
+        max_score = 0
+        elements = elements_per_assessment_period[assessment_period]
+        # If there is an ora element in the week, add 3
+        if len([element for element in elements if "openassessment" in element]) > 0:
+            max_score += 3
+        # If there is a quiz element in the week, add 3
+        if len([element for element in elements if "vertical+block" in element]) > 0:
+            max_score += 3
+        # If there is a submission element in the week, add 3
+        if len([element for element in elements if "problem+block" in element]) > 0:
+            max_score += 3
+        # If there is a video element in the week, add 1
+        if len([element for element in elements if "video" in element]) > 0:
+            max_score += 1
+        max_score_per_week[idx] = max_score
+        
+        
+    return max_score_per_week
+
+def extract_elements_per_period(course_id: str, metadata_df: pd.DataFrame):
     course_start_date = pd.Timestamp(metadata_df["object"]["start_date"])
-   
-    f = open("./mandatory_elements_per_course.json", "r")
-    all_courses_mandatory_elements = json.load(f)
-    f.close()
+    with open("./mandatory_elements_per_course.json", "r") as f:
+        all_courses_mandatory_elements = json.load(f)
 
     all_mandatory_elements = all_courses_mandatory_elements[course_id]
     elements_per_week = {}
@@ -538,6 +562,12 @@ def construct_learner_engagement_mapping(quiz_sessions_df: pd.DataFrame, metadat
         lambda elements: [element for element in elements if "video" in element] or None).dropna()
 
     assessment_periods = elements_per_assessment_period.index
+
+    return elements_per_assessment_period, quizzes_due_per_assessment_period, submissions_due_per_assessment_period, ora_due_per_assessment_period, videos_per_assessment_period, assessment_periods
+
+def construct_learner_engagement_mapping(quiz_sessions_df: pd.DataFrame, metadata_df: pd.DataFrame, course_learner_df: pd.DataFrame, video_interactions_df: pd.DataFrame, submissions_df: pd.DataFrame, ora_sessions_df: pd.DataFrame, course_id: str, course_has_due_dates: bool, db: Database) -> Tuple[Counter[tuple, int], Counter[tuple, int]]:    
+   
+    _, quizzes_due_per_assessment_period, submissions_due_per_assessment_period, ora_due_per_assessment_period, videos_per_assessment_period, assessment_periods = extract_elements_per_period(course_id, metadata_df)
 
     mooc_and_run_id = course_id.split(":")[1]
 
@@ -675,63 +705,31 @@ def get_engagement_for_period(engagement: str, idx: int) -> str:
         if not engagement_for_period in set("BOAT"):
             return "X"
         return engagement_for_period
-    except:
+    except Exception:
         return "X"
 
 def calculate_engagement(quiz_engagement: str, video_engagement: str, submission_engagement: str, ora_engagement: str, assessment_periods: pd.Series) -> str:
-    # if isinstance(video_engagement, str):
-    #     video_engagement = literal_eval(video_engagement)
-    # if isinstance(quiz_engagement, str):
-    #     quiz_engagement = literal_eval(quiz_engagement)
-    # if isinstance(submission_engagement, str):
-    #     submission_engagement = literal_eval(submission_engagement)
-    # if isinstance(ora_engagement, str):
-    #     ora_engagement = literal_eval(ora_engagement)
-    # print("Quiz engagement:", quiz_engagement)
-    # print("Video engagement:", video_engagement)
-    # print("Submission engagement:", submission_engagement)
-    # print("ORA engagement:", ora_engagement)
-    
     if not len(quiz_engagement) == len(video_engagement) == len(submission_engagement) == len(ora_engagement) == len(assessment_periods):
         print("Quiz engagement:", quiz_engagement, len(quiz_engagement))
-        # print("Video engagement:", video_engagement, len(video_engagement))
-        # print("Submission engagement:", submission_engagement, len(submission_engagement))
-        # print("ORA engagement:", ora_engagement, len(ora_engagement))
-        # print("Assessment periods:", assessment_periods, len(assessment_periods))
         raise ValueError("Lengths of engagement lists do not match")
 
-    engagement = ""
+    engagement = []
 
     for idx, _ in enumerate(assessment_periods):
+        engagement_for_period = 0
         quiz_engagement_for_period = get_engagement_for_period(quiz_engagement, idx)
         submission_engagement_for_period = get_engagement_for_period(submission_engagement, idx)
-        ora_engagement_for_period = get_engagement_for_period(ora_engagement, idx)
-
-        non_video_statuses = set([quiz_engagement_for_period,
-                                  submission_engagement_for_period, ora_engagement_for_period])
-
-        non_video_statuses.discard("X")            
+        ora_engagement_for_period = get_engagement_for_period(ora_engagement, idx)         
         video_engagement_for_period = get_engagement_for_period(video_engagement, idx)
-        all_statuses = non_video_statuses.union({video_engagement_for_period})
 
-        # Rule 1: If non_video_statuses include 'B' and may include 'T', but not 'A' or 'O'
-        if non_video_statuses == {'B'} or non_video_statuses == {'B', 'T'}:
-            engagement += "B"
-        # Rule 2: If non_video_statuses are all 'T', return 'T'
-        elif non_video_statuses == {'T'}:
-            engagement += "T"
-        # Rule 3: If non_video_statuses include a combination of "B", "O", "A", and "T", but not just "O", return 'A'
-        elif set("BOAT").issuperset(all_statuses) and not all_statuses == {'O'}:
-            engagement += "A"
-        # Rule 4: If video_engagement_for_period is 'A', return 'T' if non_video_statuses is empty, otherwise 'A'
-        elif video_engagement_for_period == "A":
-            engagement += "T" if non_video_statuses == set() else "A"
-        # Rule 5: If there are no due dates and no videos due, and non_video_statuses is empty, return 'X'
-        elif not non_video_statuses and video_engagement_for_period == "X":
-            engagement += "X"
-        # Rule 6: Default to 'O'
-        else:
-            engagement += "O"
+        engagement_for_period += engagement_to_numeric(quiz_engagement_for_period)
+        engagement_for_period += engagement_to_numeric(submission_engagement_for_period)
+        engagement_for_period += engagement_to_numeric(ora_engagement_for_period)
+        engagement_for_period += engagement_to_numeric(video_engagement_for_period)
+        
+        engagement.append(engagement_for_period)
+        
+        
 
     return engagement
 
@@ -763,34 +761,21 @@ def get_due_dates_per_assessment_period(element_time_map_due: dict, course_start
     return periods_with_due_dates
 
 
-def engagement_to_numeric(engagement_labels: str) -> list:
-    engagement_label_to_numeric = {'T': 3, 'B': 2, 'A': 1, 'O': 0}
-    return [engagement_label_to_numeric[engagement_for_period] for engagement_for_period in engagement_labels 
-            if not engagement_for_period == "X"]
+def engagement_to_numeric(engagement_label: str) -> int:
+    engagement_label_to_numeric = {'T': 3, 'B': 2, 'A': 1, 'O': 0, 'X': 0}
+    return engagement_label_to_numeric[engagement_label]
 
 
-def calculate_k_means_clusters(trajectory_frequency: pd.Series, course_run: str, gender: str) -> None:
-    # From the keys of trajectory_frequency, print an example for the different lengths of the keys
-    length_set = set()
-    for key in trajectory_frequency.keys():
-        # if no key of this length exists, add it to the set
-        new_length = True
-        for item in length_set:
-            if len(key) == len(item):
-                new_length = False
-        if new_length:
-            length_set.add(key)
-            print(key)
-            break
-
-    learner_engagement_lists = []
-
+def calculate_k_means_clusters(trajectory_frequency: pd.Series, course_run: str, gender: str, max_score_series: pd.Series) -> None:
+    # Extract periods to skip from the first trajectory
     first_trajectory = trajectory_frequency.index[0]
     periods_to_skip = [period for period, engagement in enumerate(first_trajectory, start=1) if engagement == "X"]
 
+    learner_engagement_lists = []
+
     for pattern, freq in trajectory_frequency.items():
-        numeric_values = engagement_to_numeric(pattern)
-        repeated_values = np.repeat([numeric_values], freq, axis=0)
+        pattern_array = np.array(pattern)[np.newaxis, :]  # Convert pattern to a 2D array with one row
+        repeated_values = np.repeat(pattern_array, freq, axis=0)
         learner_engagement_lists.append(repeated_values)
 
     X = np.concatenate(learner_engagement_lists, axis=0)
@@ -836,7 +821,7 @@ def calculate_k_means_clusters(trajectory_frequency: pd.Series, course_run: str,
     print("\nCluster sizes:")
     print(df['cluster'].value_counts().sort_index())
 
-    # Save the average engagement socres for a gender and course run to a file. Also save the number of learners per cluster.
+    # Save the average engagement scores for a gender and course run to a file. Also save the number of learners per cluster.
     with open(f"output/{course_run}_{gender}_clusters.txt", "w") as f:
         f.write(f"Best silhouette score: {best_score:.4f}\n\n")
         f.write("Cluster sizes:\n")
@@ -847,16 +832,22 @@ def calculate_k_means_clusters(trajectory_frequency: pd.Series, course_run: str,
 
     sorted_centroids = [centroids[i] for i in sorted_clusters]
     sorted_labels = [cluster_names[i] for i in sorted_clusters]
-
+    markers = ['o', 'v', '^', 's']
+    assert len(markers) >= len(sorted_centroids), "Not enough markers for the number of centroids"
+    # Plot the cluster centroids
     plt.figure(figsize=(10, 6))
     for i, centroid in enumerate(sorted_centroids):
-        plt.plot(centroid, label=f'{sorted_labels[i]}', marker='o', linestyle='--', color=cluster_colors[sorted_clusters[i]])
+        plt.plot(centroid, label=f'{sorted_labels[i]}', marker=markers[i], linestyle='--', color=cluster_colors[sorted_clusters[i]])
+    # Plot the max engagement scores
+    max_scores = max_score_series[~max_score_series.index.isin(periods_to_skip)]
+    plt.plot(max_scores.values, label='Max Engagement Score', marker='x', linestyle='-', color='black')
+
     plt.title(f'{gender} Cluster Centroids for {course_run}')
     plt.xlabel('Week')
     plt.ylabel('Engagement Score')
     plt.legend()
     plt.grid(True)
-    plt.xticks(range(X.shape[1]),  [f'{i+1}' for i in range(X.shape[1]) if i+1 not in periods_to_skip])
+    plt.xticks(range(X.shape[1]), [f'{i+1}' for i in range(X.shape[1]) if i+1 not in periods_to_skip])
     plt.savefig(f'figures/{gender}_{course_run}.png')
     plt.close()
 
@@ -912,6 +903,10 @@ def main() -> None:
             escaped_course_id = escape_id(full_course_id)
 
             metadata = get_metadata(db, course_id_with_course_run)
+            course_id = "course-v1:DelftX+" + "+".join(course_id_with_course_run.split("_")[:2])
+            elements_per_assessment_period, *_ = extract_elements_per_period(course_id, metadata)
+
+            max_score_series = get_max_score_per_week(elements_per_assessment_period)
             course_has_due_dates = has_due_dates(metadata)
             
             course_learner = get_course_learner(
@@ -932,7 +927,6 @@ def main() -> None:
 
             filtered_ids: set[str] = set(filtered_learners['course_learner_id'].unique())
 
-            course_id = "course-v1:DelftX+" + "+".join(course_id_with_course_run.split("_")[:2])
             submissions = get_submissions(db, course_id, filtered_ids)
             print("Submissions done")
             video_interactions = get_video_interactions(
@@ -951,9 +945,9 @@ def main() -> None:
             course_run = full_course_id.split(":")[1].split("+")
             title = f"{course_run[1]}_{course_run[2]}"
             calculate_k_means_clusters(
-                male_learner_engagement_mapping, title, "Male")
+                male_learner_engagement_mapping, title, "Male", max_score_series)
             calculate_k_means_clusters(
-                female_learner_engagement_mapping, title, "Female")
+                female_learner_engagement_mapping, title, "Female", max_score_series)
 
         except Exception as ex:
             print(''.join(traceback.format_exception(type(ex),
