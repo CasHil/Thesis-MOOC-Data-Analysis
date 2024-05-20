@@ -21,29 +21,26 @@ def main():
     os.makedirs(automated_classification_dir, exist_ok=True)
     os.makedirs(automated_counts_dir, exist_ok=True)
 
-    understanding_and_learning_cluster_name = 'Understanding and Learning'
-    interested_cluster_name = 'Interested'
-    studies_cluster_name = 'Studies'
-    career_cluster_name = 'Career'
-    other_cluster_name = 'Other'
-    teaching_cluster_name = 'Teaching'
+    interested_cluster_name = 'interested'
+    studies_cluster_name = 'studies'
+    career_cluster_name = 'career'
+    other_cluster_name = 'other'
+    teaching_cluster_name = 'teaching'
 
     for file in open_response_files:
         course = file.split(os.sep)[-1].split('_')[0]
         counts = pd.DataFrame(columns=[
-                              'Gender', understanding_and_learning_cluster_name, interested_cluster_name, studies_cluster_name, career_cluster_name, other_cluster_name, teaching_cluster_name])
+                              'gender', interested_cluster_name, studies_cluster_name, career_cluster_name, other_cluster_name, teaching_cluster_name])
         df = pd.read_csv(file)
 
         # Create a DataFrame for classified responses
         classified_responses = pd.DataFrame(
-            columns=['Response', 'Classification'])
+            columns=['hash_id', 'gender', 'response', 'classification'])
 
         teacher_words = ['teach', 'instruct',
                          'professor', 'lecturer']
-        understanding_and_learning_words = ['learn', 'educat', 'knowledg',
-                                            'understand', 'inform']
         interest_words = ['interest', 'curio',
-                          'fascin', 'passion', 'hobb']
+                          'fascin', 'passion', 'hobb', 'understand', 'knowledg', 'inform']
         studies_words = ['study', 'studi', 'degree', 'program', 'course', 'subject', 'major', 'minor', 'college',
                          'univ', 'hs', 'school', 'master', 'bachelor', 'phd', 'certif', 'diploma', 'academ', 'homework', 'class', 'grad']
         career_words = ['career', 'work', 'job', 'business', 'tester', 'developer', 'programmer', 'engineer', 'analyst', 'designer',
@@ -59,21 +56,18 @@ def main():
 
             word_counts = {
                 teaching_cluster_name: 0,
-                understanding_and_learning_cluster_name: 0,
                 interested_cluster_name: 0,
                 studies_cluster_name: 0,
                 career_cluster_name: 0,
                 other_cluster_name: 0
             }
 
-            gender = row.iloc[1]
+            gender = row['gender']
+            hash_id = row['hash_id']
 
             for word in response_words:
                 if any(substring in word for substring in teacher_words):
                     word_counts[teaching_cluster_name] += 1
-
-                if any(substring in word for substring in understanding_and_learning_words):
-                    word_counts[understanding_and_learning_cluster_name] += 1
 
                 if any(substring in word for substring in interest_words):
                     word_counts[interested_cluster_name] += 1
@@ -85,13 +79,13 @@ def main():
                     word_counts[career_cluster_name] += 1
 
             # 'this class', 'this course', 'the class' and 'the course' should not count as learning
-            word_counts[understanding_and_learning_cluster_name] -= response_words.count(
+            word_counts[interested_cluster_name] -= response_words.count(
                 'this course')
-            word_counts[understanding_and_learning_cluster_name] -= response_words.count(
+            word_counts[interested_cluster_name] -= response_words.count(
                 'this class')
-            word_counts[understanding_and_learning_cluster_name] -= response_words.count(
+            word_counts[interested_cluster_name] -= response_words.count(
                 'the course')
-            word_counts[understanding_and_learning_cluster_name] -= response_words.count(
+            word_counts[interested_cluster_name] -= response_words.count(
                 'the class')
 
             word_counts[interested_cluster_name] += response_words.count('fun')
@@ -118,23 +112,23 @@ def main():
                 cluster = max_clusters[0]
 
             classified_responses = pd.concat([classified_responses, pd.DataFrame(
-                {'Response': [response], 'Classification': [cluster]})], ignore_index=True)
+                {'gender': [gender], 'hash_id': [hash_id], 'response': [response], 'classification': [cluster]})], ignore_index=True)
 
-            if gender not in counts['Gender'].values:
-                counts = pd.concat([counts, pd.DataFrame({'Gender': [gender], teaching_cluster_name: [0], understanding_and_learning_cluster_name: [
-                                    0], interested_cluster_name: [0], studies_cluster_name: [0], career_cluster_name: [0], other_cluster_name: [0]})], ignore_index=True)
+            if gender not in counts['gender'].values:
+                counts = pd.concat([counts, pd.DataFrame({'gender': [gender], teaching_cluster_name: [0], interested_cluster_name: [
+                                   0], studies_cluster_name: [0], career_cluster_name: [0], other_cluster_name: [0]})], ignore_index=True)
 
-            counts.loc[counts['Gender'] == gender,
+            counts.loc[counts['gender'] == gender,
                        teaching_cluster_name] += word_counts[teaching_cluster_name]
-            counts.loc[counts['Gender'] == gender,
-                       understanding_and_learning_cluster_name] += word_counts[understanding_and_learning_cluster_name]
-            counts.loc[counts['Gender'] == gender,
+            counts.loc[counts['gender'] == gender,
                        interested_cluster_name] += word_counts[interested_cluster_name]
-            counts.loc[counts['Gender'] == gender,
+            counts.loc[counts['gender'] == gender,
+                       interested_cluster_name] += word_counts[interested_cluster_name]
+            counts.loc[counts['gender'] == gender,
                        studies_cluster_name] += word_counts[studies_cluster_name]
-            counts.loc[counts['Gender'] == gender,
+            counts.loc[counts['gender'] == gender,
                        career_cluster_name] += word_counts[career_cluster_name]
-            counts.loc[counts['Gender'] == gender,
+            counts.loc[counts['gender'] == gender,
                        other_cluster_name] += word_counts[other_cluster_name]
 
         # Save the classified responses to a CSV file
