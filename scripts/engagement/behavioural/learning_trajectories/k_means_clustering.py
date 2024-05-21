@@ -20,7 +20,7 @@ from pymongo.database import Database
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import json
-
+import os
 
 def get_courses(db: Database) -> pd.DataFrame:
     courses = db["courses"].find()
@@ -571,27 +571,6 @@ def construct_learner_engagement_mapping(quiz_sessions_df: pd.DataFrame, metadat
 
     mooc_and_run_id = course_id.split(":")[1]
 
-    # empty_tuple = ("",) * len(assessment_periods)
-    # empty_tuple_series_pd = pd.Series([empty_tuple for _ in range(len(course_learner_df))])
-
-    # if not video_interactions_df.empty:
-    #     video_engagement_by_id = video_interactions_df.groupby('course_learner_id')
-    #     video_engagement = course_learner_df.apply(
-    #         lambda row: calculate_video_engagement(
-    #             video_engagement_by_id.get_group(row['course_learner_id']) if row['course_learner_id'] in video_engagement_by_id.groups else pd.DataFrame(),
-    #             metadata_df,
-    #             videos_per_assessment_period,
-    #             assessment_periods,
-    #             db
-    #         ),
-    #         axis=1,
-    #     )
-
-    # else:
-    #     video_engagement = empty_tuple_series_pd
-
-    # course_learner_df['video_engagement'] = video_engagement
-
     course_learner_ddf: DaskDataFrame = dd.from_pandas(course_learner_df, npartitions=6)
     empty_engagement_string = "X" * len(assessment_periods)
     empty_tuple_series_pd = pd.Series([empty_engagement_string for _ in range(int(course_learner_ddf.shape[0].compute()))])
@@ -691,14 +670,6 @@ def construct_learner_engagement_mapping(quiz_sessions_df: pd.DataFrame, metadat
 
     course_learner_df.to_csv(f"output/{mooc_and_run_id}_learner_engagement.csv", index=False)
 
-    male_counts = course_learner_df[course_learner_df['gender']
-                                    == 'm']['engagement'].value_counts()
-    female_counts = course_learner_df[course_learner_df['gender']
-                                      == 'f']['engagement'].value_counts()
-
-    return male_counts, female_counts
-
-
 def get_engagement_for_period(engagement: str, idx: int) -> str:
     try:
         engagement_for_period = engagement[idx]
@@ -766,7 +737,7 @@ def engagement_to_numeric(engagement_label: str) -> int:
     return engagement_label_to_numeric[engagement_label]
 
 
-def calculate_k_means_clusters(trajectory_frequency: pd.Series, course_run: str, gender: str, max_score_series: pd.Series) -> None:
+def calculate_k_means_clusters(trajectory_frequency: pd.Series, course_run: str, label: str, gender: str, max_score_series: pd.Series) -> None:
     # Extract periods to skip from the first trajectory
     first_trajectory = trajectory_frequency.index[0]
     periods_to_skip = [period for period, engagement in enumerate(first_trajectory, start=1) if engagement == "X"]
@@ -774,6 +745,8 @@ def calculate_k_means_clusters(trajectory_frequency: pd.Series, course_run: str,
     learner_engagement_lists = []
 
     for pattern, freq in trajectory_frequency.items():
+        # Pattern is a string. Convert it to a list of integers
+        pattern = literal_eval(pattern)
         pattern_array = np.array(pattern)[np.newaxis, :]  # Convert pattern to a 2D array with one row
         repeated_values = np.repeat(pattern_array, freq, axis=0)
         learner_engagement_lists.append(repeated_values)
@@ -782,6 +755,12 @@ def calculate_k_means_clusters(trajectory_frequency: pd.Series, course_run: str,
 
     best_score = -1
     best_kmeans = None
+
+    # Completing, Auditing, Disengaging, Sampling
+    n_clusters = 4
+    if len(X) <= n_clusters:
+        print("Error: The number of samples must be greater than the number of clusters.")
+        return
 
     for _ in tqdm(range(100), desc=f"Finding best KMeans clusters for {course_run}"):
         kmeans = KMeans(n_clusters=4, random_state=None).fit(X)
@@ -807,6 +786,7 @@ def calculate_k_means_clusters(trajectory_frequency: pd.Series, course_run: str,
     cluster_names = {sorted_clusters[0]: 'Completing', sorted_clusters[1]: 'Auditing', sorted_clusters[2]: 'Disengaging', sorted_clusters[3]: 'Sampling'}
     cluster_colors = {sorted_clusters[0]: '#D81B60', sorted_clusters[1]: '#1E88E5', sorted_clusters[2]: '#FFC107', sorted_clusters[3]: '#004D40'}
 
+    df['cluster'] = df['cluster'].map(cluster_names)
     print(f"\n{course_run}")
     print(f"Best silhouette score: {best_score:.4f}")
 
@@ -814,21 +794,33 @@ def calculate_k_means_clusters(trajectory_frequency: pd.Series, course_run: str,
     print(df['cluster'].value_counts().sort_index())
 
     for cluster in sorted(df['cluster'].unique()):
-        print(f"\nAverage engagement scores for Cluster {cluster_names[cluster]}:")
+        print(f"\nAverage engagement scores for Cluster {cluster}:")
         print(df[df['cluster'] == cluster].iloc[:, :-1].mean())
 
     # Print how many learners are in each cluster
     print("\nCluster sizes:")
     print(df['cluster'].value_counts().sort_index())
 
-    # Save the average engagement scores for a gender and course run to a file. Also save the number of learners per cluster.
-    with open(f"output/{course_run}_{gender}_clusters.txt", "w") as f:
-        f.write(f"Best silhouette score: {best_score:.4f}\n\n")
-        f.write("Cluster sizes:\n")
-        f.write(f"{df['cluster'].value_counts().sort_index()}\n\n")
-        for cluster in sorted(df['cluster'].unique()):
-            f.write(f"Average engagement scores for Cluster {cluster_names[cluster]}:\n")
-            f.write(f"{df[df['cluster'] == cluster].iloc[:, :-1].mean()}\n\n")
+
+    if label:
+        os.makedirs(f"output/{label}", exist_ok=True)
+        with open(f"output/{label}/{course_run}_clusters.txt", "w") as f:
+            f.write(f"Best silhouette score: {best_score:.4f}\n\n")
+            f.write("Cluster sizes:\n")
+            f.write(f"{df['cluster'].value_counts().sort_index()}\n\n")
+            for cluster in sorted(df['cluster'].unique()):
+                f.write(f"Average engagement scores for Cluster {cluster}:\n")
+                f.write(f"{df[df['cluster'] == cluster].iloc[:, :-1].mean()}\n\n")
+
+    else:
+        os.makedirs(f"output/{gender}", exist_ok=True)
+        with open(f"output/{gender}/{course_run}_clusters.txt", "w") as f:
+            f.write(f"Best silhouette score: {best_score:.4f}\n\n")
+            f.write("Cluster sizes:\n")
+            f.write(f"{df['cluster'].value_counts().sort_index()}\n\n")
+            for cluster in sorted(df['cluster'].unique()):
+                f.write(f"Average engagement scores for Cluster {cluster}:\n")
+                f.write(f"{df[df['cluster'] == cluster].iloc[:, :-1].mean()}\n\n")
 
     sorted_centroids = [centroids[i] for i in sorted_clusters]
     sorted_labels = [cluster_names[i] for i in sorted_clusters]
@@ -842,13 +834,21 @@ def calculate_k_means_clusters(trajectory_frequency: pd.Series, course_run: str,
     max_scores = max_score_series[~max_score_series.index.isin(periods_to_skip)]
     plt.plot(max_scores.values, label='Max Engagement Score', marker='x', linestyle='-', color='black')
 
-    plt.title(f'{gender} Cluster Centroids for {course_run}')
+    if label:
+        plt.title(f'{gender} {label.capitalize()} Cluster Centroids for {course_run}')
+    else:
+        plt.title(f'{gender} Cluster Centroids for {course_run}')
+        
     plt.xlabel('Week')
     plt.ylabel('Engagement Score')
     plt.legend()
     plt.grid(True)
     plt.xticks(range(X.shape[1]), [f'{i+1}' for i in range(X.shape[1]) if i+1 not in periods_to_skip])
-    plt.savefig(f'figures/{gender}_{course_run}.png')
+
+    if label:
+        plt.savefig(f'output/{label}/{course_run}.png')
+    else:
+        plt.savefig(f'output/{gender}/{course_run}.png')
     plt.close()
 
     # Return a dictionary of the cluster labels and their sizes
@@ -874,14 +874,7 @@ def get_quiz_sessions(db: Database, course_id: str, filtered_ids: set[str]) -> p
 
     return downcast_numeric_columns(quiz_sessions_df)
 
-
-def main() -> None:
-    client = MongoClient("mongodb://localhost:27017/")
-    print("Connected to MongoDB")
-    db = client["edx_prod"]
-
-    courses = get_courses(db)
-
+def process_course_data(db: Database, courses: pd.DataFrame) -> None:
     for _, course in courses.iterrows():
         try:
             full_course_id: str = course["course_id"]
@@ -903,8 +896,8 @@ def main() -> None:
             escaped_course_id = escape_id(full_course_id)
 
             metadata = get_metadata(db, course_id_with_course_run)
-            course_id = "course-v1:DelftX+" + "+".join(course_id_with_course_run.split("_")[:2])
-            elements_per_assessment_period, *_ = extract_elements_per_period(course_id, metadata)
+            full_course_id = "course-v1:DelftX+" + "+".join(course_id_with_course_run.split("_")[:2])
+            elements_per_assessment_period, *_ = extract_elements_per_period(full_course_id, metadata)
 
             max_score_series = get_max_score_per_week(elements_per_assessment_period)
             course_has_due_dates = has_due_dates(metadata)
@@ -927,32 +920,88 @@ def main() -> None:
 
             filtered_ids: set[str] = set(filtered_learners['course_learner_id'].unique())
 
-            submissions = get_submissions(db, course_id, filtered_ids)
+            submissions = get_submissions(db, full_course_id, filtered_ids)
             print("Submissions done")
             video_interactions = get_video_interactions(
-                db, course_id, filtered_ids, metadata)
+                db, full_course_id, filtered_ids, metadata)
             print("Video interactions done")
             quiz_sessions = get_quiz_sessions(
-                db, course_id, filtered_ids)
+                db, full_course_id, filtered_ids)
             print("Quiz sessions done")
             ora_sessions = get_ora_sessions(
-                db, course_id, filtered_ids)
+                db, full_course_id, filtered_ids)
 
             print("ORA sessions done")
             male_learner_engagement_mapping, female_learner_engagement_mapping = construct_learner_engagement_mapping(quiz_sessions, metadata,
                                                                                                                       filtered_learners, video_interactions, submissions, ora_sessions, full_course_id, course_has_due_dates, db)
-            
-            course_run = full_course_id.split(":")[1].split("+")
-            title = f"{course_run[1]}_{course_run[2]}"
-            calculate_k_means_clusters(
-                male_learner_engagement_mapping, title, "Male", max_score_series)
-            calculate_k_means_clusters(
-                female_learner_engagement_mapping, title, "Female", max_score_series)
-
+            return male_learner_engagement_mapping, female_learner_engagement_mapping
         except Exception as ex:
             print(''.join(traceback.format_exception(type(ex),
                                                      value=ex, tb=ex.__traceback__)))
+            
+def cluster_learner_engagement(db: Database) -> None:
+    for file in os.listdir("output"):
+        if not file.endswith(".csv"):
+           continue
 
+        # EX101x
+        course_id: str = file.split("+")[1]
+
+        # EX101x_2T2018
+        # course_id_with_run: str = "_".join(file.split("_")[0].split("+")[1:3])
+
+        # course-v1:DelftX+EX101x+2T2018
+        full_course_id = "course-v1:" + file.split("_")[0]
+
+        learner_engagement_df = pd.read_csv(f"output/{file}")
+        query = {"object.course_id": full_course_id}
+        metadata = db["metadata"].find_one(query)
+        metadata_df = pd.DataFrame(metadata)
+        elements_per_assessment_period, *_ = extract_elements_per_period(full_course_id, metadata_df)
+        
+        max_score_series = get_max_score_per_week(elements_per_assessment_period)
+        reasons_for_enrolment_df = pd.read_csv(f"output/reasons_for_enrolment/{course_id}.csv")
+        
+        for gender in ["m", "f"]:
+            full_gender = "Male" if gender == "m" else "Female"
+            gender_counts = learner_engagement_df[learner_engagement_df['gender']
+                                        == gender]['engagement'].value_counts()
+            calculate_k_means_clusters(gender_counts, course_id, "", full_gender, max_score_series)
+
+            filtered_reasons_for_enrolment_df = reasons_for_enrolment_df[reasons_for_enrolment_df['gender'] == gender]
+            filtered_learner_ids = learner_engagement_df['hash_id'] = learner_engagement_df['course_learner_id'].apply(lambda x: x.split("_")[-1])
+            filtered_reasons_for_enrolment_df = filtered_reasons_for_enrolment_df[filtered_reasons_for_enrolment_df['hash_id'].isin(filtered_learner_ids)]
+            
+            for reasons_for_enrolment in filtered_reasons_for_enrolment_df['response'].unique():
+                learners_with_reason = filtered_reasons_for_enrolment_df[filtered_reasons_for_enrolment_df['response'] == reasons_for_enrolment]
+                
+                # Get the learner IDs for this reason
+                learner_ids_with_reason = learners_with_reason['hash_id']
+                
+                # Filter the engagement data for these learners
+                engagement_data_for_reason = learner_engagement_df[learner_engagement_df['hash_id'].isin(learner_ids_with_reason)]
+                
+                reason_counts = engagement_data_for_reason['engagement'].value_counts()
+                # Run the k-means clustering function for these learners
+                calculate_k_means_clusters(reason_counts, course_id, reasons_for_enrolment, full_gender, max_score_series)
+
+def main() -> None:
+    client = MongoClient("mongodb://localhost:27017/")
+    print("Connected to MongoDB")
+    db = client["edx_prod"]
+
+    courses = get_courses(db)
+
+    os.makedirs("output/figures", exist_ok=True)
+    os.makedirs("output/learner_engagement", exist_ok=True)
+
+    should_process_course_data = False
+    if should_process_course_data:
+        process_course_data(db, courses)
+
+    should_cluster_learner_engagement = True
+    if should_cluster_learner_engagement:
+        cluster_learner_engagement(db)
 
 if __name__ == '__main__':
     main()
