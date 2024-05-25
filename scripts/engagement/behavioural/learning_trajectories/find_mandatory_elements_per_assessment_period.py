@@ -44,6 +44,17 @@ def get_mandatory_problems(db: Database, course_id: str, learner_id: str) -> set
     
     return set(problems_df["question_id"].unique())
 
+def get_mandatory_ora_sessions(db: Database, course_id: str, learner_id: str) -> set[str]:
+    print("Getting mandatory ORA sessions for learner", learner_id, "in course", course_id)
+    ora_sessions = db["ora_sessions"].find({"course_learner_id": learner_id})
+    ora_sessions_df = pd.DataFrame(ora_sessions)
+
+    if ora_sessions_df.empty:
+        return set()
+
+    return set(ora_sessions_df["block_id"].unique())
+
+
 def find_mandatory_elements_by_best_learner(course_id: str, perfect_learner: str, db: Database) -> set[str]:
     course = db["courses"].find_one({"course_id": course_id})
     if course is None:
@@ -69,13 +80,10 @@ def group_mandatory_elements_by_deadline(course_id: str, mandatory_elements: set
     for element in mandatory_elements:
         print(element)
         if due_dates.get(element) is not None:
-            print(element, "1")
             due_date = due_dates.get(element)
         elif element_time_map.get(element) is not None:
-            print(element, "2")
             due_date = element_time_map.get(element)
         elif child_parent_map.get(element) is not None:
-            print(element, "3")
             parent = child_parent_map.get(element)
             while parent not in due_dates and "chapter" not in parent:
                 parent = child_parent_map[parent]
