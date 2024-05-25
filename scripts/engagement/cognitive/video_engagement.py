@@ -22,19 +22,21 @@ def categorize_seek_rate_change(events):
 # Function to create clickstream sequences
 
 
-def create_clickstream_sequences(data, event_mapping):
+def create_clickstream_sequences(data: pd.DataFrame, event_mapping: dict[str, str]):
     clickstream_data = []
 
-    for course_entry in data:
-        course_id = course_entry['course_id']
-        learner_id = course_entry['course_learner_id']
-        videos = course_entry['videos']
+    for _, row in data.iterrows():
+        course_id = row['course_id']
+        learner_id = row['course_learner_id']
+        videos = row['videos']
 
         for video_id, events in videos.items():
             session_events = []
             for event in events:
-                event_time, event_type, additional_info = event
-                if event_type == 'load_video':
+                event_type = event['event_type']
+                event_time = event['event_time']
+                additional_info = event['additional_info']
+                if event_type == 'load_video' or event_type == 'stop_video':
                     if session_events:
                         session_events = categorize_seek_rate_change(
                             session_events)
@@ -78,7 +80,6 @@ def main():
         'play_video': 'Pl',
         'seek_video': 'Sf',  # initial mapping
         'speed_change_video': 'Rf',  # initial mapping
-        'stop_video': 'stop_video',
     }
 
     for course in courses:
@@ -86,16 +87,15 @@ def main():
             {'course_id': {"$regex": course}})
         video_engagement_sessions_df = pd.DataFrame(video_engagement_sessions)
         # Find unique course ids
-        course_runs = set([entry['course_id']
-                          for entry in video_engagement_sessions])
+        course_runs = video_engagement_sessions_df['course_id'].unique()
         for course_run in course_runs:
+            print(course_run)
+            if course_run == 'course-v1:DelftX+EX101+3T':
+                continue
             course_data = video_engagement_sessions_df[video_engagement_sessions_df['course_id'] == course_run]
             clickstream_sequences_df = create_clickstream_sequences(
                 course_data, event_mapping)
             print(clickstream_sequences_df)
 
-        clickstream_sequences_df = create_clickstream_sequences(
-            video_engagement_sessions, event_mapping)
-
-    # Display the DataFrame
-    print(clickstream_sequences_df)
+if __name__ == '__main__':
+    main()
