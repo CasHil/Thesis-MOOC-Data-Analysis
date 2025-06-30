@@ -738,6 +738,7 @@ def engagement_to_numeric(engagement_label: str) -> int:
 
 def calculate_k_means_clusters(learner_engagement_df: pd.DataFrame, course_id: str, course_run: str, label: str, gender: str, max_score_series: pd.Series) -> pd.DataFrame:
     # Extract periods to skip from the first trajectory
+    print_cluster_information = False
     first_trajectory = literal_eval(learner_engagement_df.iloc[0]['engagement'])
     periods_to_skip = [period for period, engagement in enumerate(first_trajectory, start=1) if engagement == "X"]
 
@@ -753,10 +754,10 @@ def calculate_k_means_clusters(learner_engagement_df: pd.DataFrame, course_id: s
 
     X = np.array(learner_engagement_lists)
 
-    best_score = -1
+    best_silhouette_score = -1
     best_kmeans = None
 
-    # Completing, Auditing, Disengaging, Sampling
+    # Completing, Disengaging, Auditing, Sampling
     n_clusters = 4
     
     if len(X) < n_clusters:
@@ -765,14 +766,14 @@ def calculate_k_means_clusters(learner_engagement_df: pd.DataFrame, course_id: s
     for _ in tqdm(range(100), desc=f"Finding best KMeans clusters for {course_run}"):
         kmeans = KMeans(n_clusters=4, random_state=None).fit(X)
         score = silhouette_score(X, kmeans.labels_)
-        if score > best_score:
-            best_score = score
+        if score > best_silhouette_score:
+            best_silhouette_score = score
             best_kmeans = kmeans
 
     clusters = best_kmeans.labels_
     centroids = best_kmeans.cluster_centers_
 
-    columns = [f'Week {i+1}' for i in range(X.shape[1]) if i+1 not in periods_to_skip]
+    columns = [f'Assessment Period {i+1}' for i in range(X.shape[1]) if i+1 not in periods_to_skip]
     df = pd.DataFrame(X, columns=columns)
     df['cluster'] = clusters
 
@@ -783,7 +784,7 @@ def calculate_k_means_clusters(learner_engagement_df: pd.DataFrame, course_id: s
     sorted_clusters = cluster_averages.sort_values(ascending=False).index
 
     # Define cluster names and colors
-    cluster_names = {sorted_clusters[0]: 'Completing', sorted_clusters[1]: 'Auditing', sorted_clusters[2]: 'Disengaging', sorted_clusters[3]: 'Sampling'}
+    cluster_names = {sorted_clusters[0]: 'Completing', sorted_clusters[1]: 'Disengaging', sorted_clusters[2]: 'Auditing', sorted_clusters[3]: 'Sampling'}
     cluster_colors = {sorted_clusters[0]: '#D81B60', sorted_clusters[1]: '#1E88E5', sorted_clusters[2]: '#FFC107', sorted_clusters[3]: '#004D40'}
 
     df['cluster'] = df['cluster'].map(cluster_names)
@@ -791,24 +792,25 @@ def calculate_k_means_clusters(learner_engagement_df: pd.DataFrame, course_id: s
     # Map clusters back to course_learner_ids
     learner_cluster_df = pd.DataFrame({'course_learner_id': learner_ids, 'cluster': df['cluster']})
 
-    print(f"\n{course_run}")
-    print(f"Best silhouette score: {best_score:.4f}")
+    if print_cluster_information:
+        print(f"\n{course_run}")
+        print(f"Best silhouette score: {best_silhouette_score:.4f}")
 
-    print("\nCluster sizes:")
-    print(df['cluster'].value_counts().sort_index())
+        print("\nCluster sizes:")
+        print(df['cluster'].value_counts().sort_index())
 
-    for cluster in sorted(df['cluster'].unique()):
-        print(f"\nAverage engagement scores for Cluster {cluster}:")
-        print(df[df['cluster'] == cluster].iloc[:, :-1].mean())
+        for cluster in sorted(df['cluster'].unique()):
+            print(f"\nAverage engagement scores for Cluster {cluster}:")
+            print(df[df['cluster'] == cluster].iloc[:, :-1].mean())
 
-    # Print how many learners are in each cluster
-    print("\nCluster sizes:")
-    print(df['cluster'].value_counts().sort_index())
+        # Print how many learners are in each cluster
+        print("\nCluster sizes:")
+        print(df['cluster'].value_counts().sort_index())
 
     if label:
         os.makedirs(f"output/{course_id}/{course_run}/{label}", exist_ok=True)
         with open(f"output/{course_id}/{course_run}/{label}/clusters.txt", "w") as f:
-            f.write(f"Best silhouette score: {best_score:.4f}\n\n")
+            f.write(f"Best silhouette score: {best_silhouette_score:.4f}\n\n")
             f.write("Cluster sizes:\n")
             f.write(f"{df['cluster'].value_counts().sort_index()}\n\n")
             for cluster in sorted(df['cluster'].unique()):
@@ -818,7 +820,7 @@ def calculate_k_means_clusters(learner_engagement_df: pd.DataFrame, course_id: s
     else:
         os.makedirs(f"output/{course_id}/{course_run}/{gender}", exist_ok=True)
         with open(f"output/{course_id}/{course_run}/{gender}/clusters.txt", "w") as f:
-            f.write(f"Best silhouette score: {best_score:.4f}\n\n")
+            f.write(f"Best silhouette score: {best_silhouette_score:.4f}\n\n")
             f.write("Cluster sizes:\n")
             f.write(f"{df['cluster'].value_counts().sort_index()}\n\n")
 
@@ -835,15 +837,18 @@ def calculate_k_means_clusters(learner_engagement_df: pd.DataFrame, course_id: s
     plt.plot(max_scores.values, label='Max Engagement Score', marker='x', linestyle='-', color='black')
 
     if label:
-        plt.title(f'{gender} {label.capitalize()} Cluster Centroids for {course_run}')
+        plt.title(f'{gender} {label.capitalize()} Cluster Centroids for {course_id}_{course_run}')
     else:
-        plt.title(f'{gender} Cluster Centroids for {course_run}')
+        plt.title(f'{gender} Cluster Centroids for {course_id}_{course_run}', fontsize=20)
         
-    plt.xlabel('Week')
-    plt.ylabel('Engagement Score')
-    plt.legend()
+    plt.xlabel('Engagement Period', fontsize=20)
+    plt.ylabel('Engagement Score', fontsize=20)
+    plt.ylim(0, 11)
+
+    plt.legend(fontsize=14, loc='upper right', ncol=2)
     plt.grid(True)
-    plt.xticks(range(X.shape[1]), [f'{i+1}' for i in range(X.shape[1]) if i+1 not in periods_to_skip])
+    plt.xticks(range(X.shape[1]), [f'{i+1}' for i in range(X.shape[1]) if i+1 not in periods_to_skip], fontsize=16)
+    plt.yticks(range(0, 11), fontsize=16)
 
     if label:
         plt.savefig(f'output/{course_id}/{course_run}/{label}/{course_run}.png')
@@ -853,7 +858,7 @@ def calculate_k_means_clusters(learner_engagement_df: pd.DataFrame, course_id: s
 
     # Rename course_learner_id to hash_id
     learner_cluster_df.rename(columns={'course_learner_id': 'hash_id'}, inplace=True)
-    return learner_cluster_df[['hash_id', 'cluster']]
+    return learner_cluster_df[['hash_id', 'cluster']], best_silhouette_score
 
 
 def get_quiz_sessions(db: Database, course_id: str, filtered_ids: set[str]) -> pd.DataFrame:
@@ -948,9 +953,12 @@ def get_course_runs(course_id):
 
 def cluster_learner_engagement(db: Database) -> None:
     course_ids = json.loads(os.getenv("COURSES"))
+    cluster_counts = {}
 
     for course_id in course_ids:
         course_runs = get_course_runs(course_id)
+        silhouette_scores = []
+
         for course_run in course_runs:
             file = f"DelftX+{course_id}+{course_run}_learner_engagement.csv"
             full_course_id = "course-v1:DelftX+" + course_id + "+" + course_run
@@ -964,29 +972,48 @@ def cluster_learner_engagement(db: Database) -> None:
                 elements_per_assessment_period, *_ = extract_elements_per_period(full_course_id, metadata_df)
                 max_score_series = get_max_score_per_week(elements_per_assessment_period)
 
-            reasons_for_enrolment_df = pd.read_csv(f"output/reasons_for_enrolment/{course_id}.csv")
-
             for gender in ["m", "f"]:
                 full_gender = "Male" if gender == "m" else "Female"
                 gender_df = learner_engagement_df[learner_engagement_df['gender'] == gender]
-                clusters_df = calculate_k_means_clusters(gender_df, course_id, course_run, "", full_gender, max_score_series)
-                # Merge clusters_df with learner_engagement_df
+                clusters_df, silhouette_score = calculate_k_means_clusters(gender_df, course_id, course_run, "", full_gender, max_score_series)
                 clusters_df['hash_id'] = clusters_df['hash_id'].apply(lambda x: x.split("_")[-1])
 
-                # Filter reasons_for_enrolment_df by gender and merge with clusters
-                filtered_reasons_for_enrolment_df = reasons_for_enrolment_df[reasons_for_enrolment_df['gender'] == gender]
-                response_cluster_df = filtered_reasons_for_enrolment_df.merge(clusters_df, on='hash_id')
+                # Get the cluster counts for this course run and gender
+                run_cluster_counts = clusters_df['cluster'].value_counts()
 
-                # Count the number of people in each cluster for each response
-                response_cluster_counts = response_cluster_df.groupby(['response', 'cluster']).size().unstack(fill_value=0)
+                # Store the cluster counts for this course run and gender
+                if (course_id, full_gender) in cluster_counts:
+                    cluster_counts[(course_id, full_gender)] = cluster_counts[(course_id, full_gender)].add(run_cluster_counts, fill_value=0)
+                else:
+                    cluster_counts[(course_id, full_gender)] = run_cluster_counts
+
+                # Store the silhouette score for this course run
+                silhouette_scores.append(silhouette_score)
+
+        # Calculate and print the average silhouette score for this course_id
+        avg_silhouette_score = sum(silhouette_scores) / len(silhouette_scores) if silhouette_scores else 0
+        print(f"Average silhouette score for {course_id}: {avg_silhouette_score}")
+
+    # Print the total cluster counts for each course_id and gender
+    for (course_id, gender), counts in cluster_counts.items():
+        print(f"Total cluster counts for {course_id} - {gender}")
+        print(counts)
                 
-                # Print or save the results
-                print(f"Cluster counts for {course_id} ({course_run}) - {full_gender}")
-                print(response_cluster_counts)
-                
-                # Optionally, save the results to a CSV
-                output_file = f"output/{course_id}_{course_run}_{full_gender}_response_cluster_counts.csv"
-                response_cluster_counts.to_csv(output_file)
+                # print(f"Clusters for {course_id} ({course_run}) - {gender}")
+                # print(clusters_df['cluster'].value_counts())
+                # filtered_reasons_for_enrolment_df = reasons_for_enrolment_df[reasons_for_enrolment_df['gender'] == gender]
+                # response_cluster_df = filtered_reasons_for_enrolment_df.merge(clusters_df, on='hash_id')
+
+                # response_cluster_counts = response_cluster_df.groupby(['response', 'cluster']).size().unstack(fill_value=0)
+                # cluster_counts[(course_id, course_run, full_gender)] = response_cluster_counts
+
+    # for (course_id, course_run, gender), counts in cluster_counts.items():
+    #     print(f"Cluster counts for {course_id} ({course_run}) - {gender}")
+    #     print(counts)
+
+    #     output_file = f"output/{course_id}_{course_run}_{gender}_response_cluster_counts.csv"
+    #     counts.to_csv(output_file)
+
 
 
 
