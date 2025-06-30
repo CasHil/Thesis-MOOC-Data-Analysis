@@ -42,17 +42,14 @@ def plot_education_distribution(course_df: pd.DataFrame, course_name: str) -> No
     education_gender_counts = education_gender_counts.reindex(
         columns=categories_order, fill_value=0)
 
-    # Adding a total column for easier analysis and dropping it for visualization
     education_gender_counts['Total'] = education_gender_counts.sum(axis=1)
     sorted_education_counts = education_gender_counts.sort_values(
         by='Total', ascending=False)
 
-    # Print detailed statistics
     print(f"Course Name: {course_name}")
     print("Education Level Distribution:")
     print(sorted_education_counts[['Total', 'Male', 'Female']])
 
-    # Drop the 'Total' column for plotting
     education_gender_counts = sorted_education_counts.drop(columns=['Total'])
 
     if not education_gender_counts.empty:
@@ -66,9 +63,8 @@ def plot_education_distribution(course_df: pd.DataFrame, course_name: str) -> No
         plt.tight_layout()
 
         for container in ax.containers:
-            plt.setp(container, width=0.85)  # Adjust the width of the bars
+            plt.setp(container, width=0.85)
 
-        # Create a custom legend
         from matplotlib.patches import Patch
         legend_elements = [Patch(facecolor='C1', label='Male'),
                            Patch(facecolor='C0', label='Female')]

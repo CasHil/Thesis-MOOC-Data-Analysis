@@ -13,7 +13,7 @@ load_dotenv()
 
 WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
 MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
-COURSES = ['EX101x', 'ST1x', 'UnixTx', 'FP101x']
+COURSES = json.loads(os.getenv('COURSES'))
 FIGURES_DIRECTORY = './figures'
 
 

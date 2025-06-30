@@ -155,6 +155,5 @@ def main():
                     "$set": {"course_id": course_id}
                 }
             )
-
             
     print("Update complete.")

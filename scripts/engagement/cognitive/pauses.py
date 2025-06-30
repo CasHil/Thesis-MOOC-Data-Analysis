@@ -15,7 +15,7 @@ load_dotenv()
 
 WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
 MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
-COURSES = ['EX101x', 'ST1x', 'UnixTx']
+COURSES = json.loads(os.getenv('COURSES'))
 
 def find_all_log_files_for_course_id(course_id: str) -> list[str]:
     return glob.glob(f"{WORKING_DIRECTORY}/{course_id}*/*.log", recursive=True)

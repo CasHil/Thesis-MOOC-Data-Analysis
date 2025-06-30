@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
+
 MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 
 

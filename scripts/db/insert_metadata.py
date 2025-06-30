@@ -7,9 +7,8 @@ import re
 load_dotenv()
 
 WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
-SCRIPTS_DIRECTORY = os.getenv('SCRIPTS_DIRECTORY')
-MOOC_DB = os.getenv('MOOC_DB_LOCATION')
-COURSES = ['EX101x', 'FP101x', 'ST1x', 'UnixTx']
+MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
+COURSES = json.loads(os.getenv('COURSES'))
 
 
 def check_valid_course(course_id: str) -> str:
@@ -158,7 +157,7 @@ def sql_insert(table: str, data_rows: list[dict[str, str]], connection: sqlite3.
 
 def main() -> None:
     course_directories_and_metadata_files = find_course_directories_and_metadata_files()
-    connection = sqlite3.connect(MOOC_DB)
+    connection = sqlite3.connect(MOOC_DB_LOCATION)
     course_runs_metadata = []
     for course_run, course_run_metadata_files in course_directories_and_metadata_files.items():
         course_metadata_map = extract_course_information(

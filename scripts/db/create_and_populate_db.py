@@ -5,9 +5,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
 SCRIPTS_DIRECTORY = os.getenv('SCRIPTS_DIRECTORY')
-MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 MOOC_DB_DIRECTORY = os.getenv('MOOC_DB_DIRECTORY')
+MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 
 
 def create_db() -> None:

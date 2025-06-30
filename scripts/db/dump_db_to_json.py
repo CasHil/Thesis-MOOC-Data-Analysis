@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
+MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 
 
 def dump_db_to_json():

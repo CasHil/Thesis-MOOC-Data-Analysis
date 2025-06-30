@@ -1,16 +1,5 @@
-# Find all folders starting with "EX101x", "ST1x", "FP101x" and "UnixTx". Go into this folder, find the file name like this: DelftX-EX101x-3T2015-course_structure-prod-analytics.json
-# Then keep all the course folder names that have a due date in any of the lines, some line with "due" in it and not "due": null
-
-# Path: db/find_courses_with_due_dates_and_quizzes.py
-
 from pymongo import MongoClient
-from tqdm import tqdm
 import os
-import json
-
-client = MongoClient('mongodb://localhost:27017/')
-db = client["edx_test"]
-collection = db.quiz_sessions
 
 def get_course_folders():
     course_folders = []
@@ -30,7 +19,6 @@ def get_course_structure(course_folder):
 def has_due_date(course_structure):
     count = 0
     for line in course_structure:
-        # print(line)
         if "due" in line and "null" not in line:
             count += 1
     return count > 5
@@ -49,6 +37,8 @@ client = MongoClient("mongodb://localhost:27017/")
 print("Connected to MongoDB")
 db = client["edx_test"]
 print("Connected to database")
+
+collection = db.quiz_sessions
 
 print(courses_with_due_dates)
 

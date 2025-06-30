@@ -12,9 +12,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
-COURSES = ['EX101x', 'FP101x', 'ST1x', 'UnixTx']
+MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
+COURSES = json.loads(os.getenv('COURSES'))
 
 
 def process_null(input_string):

@@ -3,10 +3,11 @@ from dotenv import load_dotenv
 import pandas as pd
 from course_utilities import identify_course
 import os
+import json
 
 load_dotenv()
 
-COURSES = ['EX101x', 'ST1x', 'UnixTx', 'FP101x']
+COURSES = json.loads(os.getenv('COURSES'))
 MOOC_DB_LOCATION = os.getenv('MOOC_DB_LOCATION')
 
 

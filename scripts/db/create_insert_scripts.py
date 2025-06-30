@@ -7,6 +7,7 @@ WORKING_DIRECTORY = os.getenv('WORKING_DIRECTORY')
 MOOC_DB_DIRECTORY = os.getenv('MOOC_DB_DIRECTORY')
 
 
+
 def write_insert_statements(output_file: str, table_name: str, columns: list[str], file_ending: str) -> None:
     target_files = find_files_by_ending(WORKING_DIRECTORY, file_ending)
 
