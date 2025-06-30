@@ -59,7 +59,7 @@ If we take the course run EX101x_2T2018_run6 as an example, it should contain th
 
 The scripts are written in Python 3.12.1. To install the required packages, run `pip install -r requirements.txt`.
 
-### Creating the database
+### Creating the demographic database
 
 First, change the `.env example` file to use the EdX data delivery folder as a base folder.
 To create the database, run the following command: `python scripts/setup.py`. This will create a folder called `scripts/mooc_db` in your base folder with a database called `mooc_db`.
@@ -68,4 +68,20 @@ To create the database, run the following command: `python scripts/setup.py`. Th
 
 To run the demographic graph scripts, run the command `python graphs/run_graph_scripts.py`.
 
-###
+### Creating the interaction database
+
+To answer my research questions, a database of learner interactions with the MOOCs was required. I made a fork of [ELAT-Node](https://github.com/mvallet91/ELAT-Node) (thanks Manuel!) to do this.
+
+Make sure you have `node >=11.14.0` installed. Then run `npm i` and `node scripts/engagement/behavioural/learning_paths/ELAT-Node/index.js`. Note: this takes quite a while.
+
+### Classifying learner engagement
+
+One of the most important scripts for my thesis is about learning trajectories in MOOCs, inspired by René F Kizilcec, Chris Piech, and Emily Schneider. "Deconstructing disengagement: analyzing learner subpopulations in massive open online courses". In: Proceedings of the third international conference on learning analytics and knowledge. 2013, pp. 170-179.
+
+This script can be found at `scripts/engagement/behavioural/learning_trajectories/k_means_clustering.py`. Further explanations can be found at the top of that script as comments.
+
+### Final notes
+
+There are also quite a few ideas I had that didn't end up working out, like different ways to measure learner engagement (cognitive engagement, for example). I have mentioned the most important scripts I used for my thesis. Some of the remaining scripts could serve as ideas for future research. Other scripts serve as utilities for transforming data from one form into another, for example.
+
+Questions? I am no longer available through my TU Delft mail, but you can contact me through my personal email: casperhildebrand (at) gmail.com.
