@@ -10,7 +10,35 @@ nltk.download('punkt')
 nltk.download('stopwords')
 
 
-def main():
+def count_manual_classifications():
+    manual_classifications_dir = os.path.join(
+        os.path.curdir, 'open_responses', 'classification', 'manual')
+    manual_counts_dir = 'open_responses/counts/manual'
+
+    os.makedirs(manual_counts_dir, exist_ok=True)
+    os.makedirs(manual_classifications_dir, exist_ok=True)
+
+    manual_classifications_files = glob.glob(
+        f"{manual_classifications_dir}/*.csv")
+
+    print(manual_classifications_files)
+
+    for file in manual_classifications_files:
+        df = pd.read_csv(file)
+
+        # Pivot the DataFrame
+        pivot_df = df.pivot_table(
+            index='gender', columns='classification', aggfunc='size', fill_value=0)
+
+        # Extract the original filename without the extension
+        filename = os.path.splitext(os.path.basename(file))[0]
+
+        # Save the pivot DataFrame to a CSV file with the original filename
+        pivot_df.to_csv(os.path.join(
+            manual_counts_dir, f"{filename}_clusters.csv"))
+
+
+def count_automatic_classification() -> pd.DataFrame:
     open_response_files = glob.glob('open_responses/*.csv')
     open_responses_dir = 'open_responses'
     automated_classification_dir = os.path.join(
@@ -118,18 +146,7 @@ def main():
                 counts = pd.concat([counts, pd.DataFrame({'gender': [gender], teaching_cluster_name: [0], interested_cluster_name: [
                                    0], studies_cluster_name: [0], career_cluster_name: [0], other_cluster_name: [0]})], ignore_index=True)
 
-            counts.loc[counts['gender'] == gender,
-                       teaching_cluster_name] += word_counts[teaching_cluster_name]
-            counts.loc[counts['gender'] == gender,
-                       interested_cluster_name] += word_counts[interested_cluster_name]
-            counts.loc[counts['gender'] == gender,
-                       interested_cluster_name] += word_counts[interested_cluster_name]
-            counts.loc[counts['gender'] == gender,
-                       studies_cluster_name] += word_counts[studies_cluster_name]
-            counts.loc[counts['gender'] == gender,
-                       career_cluster_name] += word_counts[career_cluster_name]
-            counts.loc[counts['gender'] == gender,
-                       other_cluster_name] += word_counts[other_cluster_name]
+            counts.loc[counts['gender'] == gender, cluster] += 1
 
         # Save the classified responses to a CSV file
         classified_responses.to_csv(os.path.join(automated_classification_dir, f"""{
@@ -139,34 +156,15 @@ def main():
         counts.to_csv(os.path.join(
             automated_counts_dir, f"{course}_clusters.csv"), index=False)
 
+
+def main():
+    should_count_automatic_classifications = False
+    if should_count_automatic_classifications:
+        count_automatic_classification()
+
     should_count_manual_classifications = True
     if should_count_manual_classifications:
         count_manual_classifications()
-
-
-def count_manual_classifications():
-    manual_classifications_dir = 'open_responses/classification/manual'
-    manual_counts_dir = 'open_responses/counts/manual'
-
-    os.makedirs(manual_counts_dir, exist_ok=True)
-    os.makedirs(manual_classifications_dir, exist_ok=True)
-
-    manual_classifications_files = glob.glob(
-        f"{manual_classifications_dir}/*.csv")
-
-    for file in manual_classifications_files:
-        df = pd.read_csv(file)
-
-        # Pivot the DataFrame
-        pivot_df = df.pivot_table(
-            index='gender', columns='classification', aggfunc='size', fill_value=0)
-
-        # Extract the original filename without the extension
-        filename = os.path.splitext(os.path.basename(file))[0]
-
-        # Save the pivot DataFrame to a CSV file with the original filename
-        pivot_df.to_csv(os.path.join(
-            manual_counts_dir, f"{filename}_clusters.csv"))
 
 
 if __name__ == "__main__":

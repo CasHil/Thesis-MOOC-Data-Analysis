@@ -131,6 +131,9 @@ def cluster_responses():
             genders = find_genders_by_user_ids(user_ids)
             presurvey["gender"] = presurvey["hash_id"].map(genders)
 
+            presurvey = presurvey.rename(columns={closed_question: 'response'})
+            closed_question = 'response'
+
             contingency_table = create_contingency_table_for_run(
                 presurvey, closed_question)
 
@@ -159,7 +162,7 @@ def cluster_responses():
 
         # Exclude the head and remove any trailing commas
         combined_clusters.to_csv(
-            f"reasons_for_enrolment/clusters/{course}.csv", index=False, header=False)
+            f"reasons_for_enrolment/clusters/{course}.csv", index=False, header=True)
 
         # Remove all the files that were combined
         for file in cluster_files:
@@ -217,6 +220,7 @@ def write_clusters_to_csv(presurvey_df: pd.DataFrame, closed_question: str, cour
     presurvey_df[closed_question] = presurvey_df[closed_question].apply(
         lambda x: 'interest' if 'interest' in x.lower() else x)
 
+    presurvey_df = presurvey_df[presurvey_df['gender'].isin(['m', 'f'])]
     presurvey_df.to_csv(
         f"reasons_for_enrolment/clusters/{course_run}.csv", index=False)
 
