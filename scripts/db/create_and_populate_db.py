@@ -21,7 +21,7 @@ def create_db() -> None:
     conn.execute("PRAGMA foreign_keys = ON;")
     cur = conn.cursor()
 
-    with open('mooc_db_schema.sql', 'r') as schema:
+    with open('scripts/db/mooc_db_schema.sql', 'r') as schema:
         cur.executescript(schema.read())
 
     print("Database created successfully.")
@@ -38,7 +38,7 @@ def insert_demographic_data() -> None:
 
     cur = conn.cursor()
 
-    subprocess.run(["py",  './create_insert_scripts.py'])
+    subprocess.run(["py",  'scripts/db/create_insert_scripts.py'])
 
     for sql_file in os.listdir(MOOC_DB_DIRECTORY):
         if sql_file.endswith('.sql'):
@@ -53,7 +53,7 @@ def insert_demographic_data() -> None:
 
 
 def insert_metadata() -> None:
-    subprocess.run(["py", "./insert_metadata.py"])
+    subprocess.run(["py", "scripts/db/insert_metadata.py"])
 
 
 def delete_sql_files():

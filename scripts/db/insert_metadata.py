@@ -26,7 +26,6 @@ def find_course_directories_and_metadata_files() -> dict[str, list[str]]:
 
     for dir_name in os.listdir(WORKING_DIRECTORY):
         if check_valid_course(dir_name):
-            print(dir_name)
             course_path = os.path.join(
                 os.path.abspath(WORKING_DIRECTORY), dir_name)
             files = []
@@ -48,10 +47,8 @@ def find_course_directories_and_metadata_files() -> dict[str, list[str]]:
 
 def extract_course_information(files):
     course_metadata_map = {}
-    print(files)
-
     if not any("course_structure" in file for file in files):
-        print("Course structure file is missing!")
+        print(f"Course structure file is missing in files: {files}")
         return course_metadata_map
 
     course_structure_file = open(next(
@@ -121,7 +118,6 @@ def extract_course_information(files):
     course_metadata_map["block_type_map"] = block_type_map
     course_metadata_map["order_map"] = order_map
     course_metadata_map["element_name_map"] = element_name_map
-    print("Metadata map ready")
     return course_metadata_map
 
 
@@ -149,7 +145,7 @@ def sql_insert(table: str, data_rows: list[dict[str, str]], connection: sqlite3.
     connection.commit()
     rows_added = cursor.rowcount
     if rows_added > 0 and table != "forum_interaction":
-        print(f"Successfully added {len(data_rows)} to {table}")
+        print(f"Successfully added {len(data_rows)} rows to {table}")
 
     cursor.close()
     connection.close()
