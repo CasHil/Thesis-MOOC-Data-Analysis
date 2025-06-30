@@ -21,6 +21,19 @@ import json
 import os
 from dotenv import load_dotenv
 
+# This script classifies learners based on their behavioural engagement into one of four categories:
+# Auditing, Completing, Disengaging, and Sampling
+# This classification is done based on the behavioural engagement with the MOOC throughout the assessment periods.
+# The term 'assessment period' is used in this script, because it is more flexible than a week. Usually, it just means a week, but it can also be 2 weeks or a month, for example.
+
+# Requirements: ELAT-Node (scripts/engagement/behavioural/learning_paths/ELAT-Node/index.js) is used to create a MongoDB database which can be queried from this script.
+
+# For each possible element in EdX, it is first determined if that element existed in that assessment period. X means that type of element didn't exist in that week.
+# O means the learner did not engage with any elements of that type in the current assessment period.
+# A means the learner did one, but not all elements of that type.
+# B means the learner engaged with all elements, but was late with some of them.
+# T means the learner engaged with all elements on time.
+
 def get_courses(db: Database) -> pd.DataFrame:
     courses = db["courses"].find()
 
